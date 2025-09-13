@@ -1,31 +1,54 @@
-Let's calculate the zoom levels required to represent the minimum measurement with 10 pixels for each unit system:
+Based on the code I've examined, I believe modifying the existing implementation would be more practical than starting from scratch. The current framework has most of the necessary components in place - it just needs a fundamental redesign in how grid spacing is determined.
 
-Based on the code in [calculateMaxZoom](cci:1://file:///Users/ajoslin/Development/schematic/src/grid/grid-units.js:55:0-68:1), let me calculate the zoom levels required to represent each minimum measurement with 10 pixels instead of the current 5 pixels:
+Here's how I'd approach modifying the existing grid to make it truly unit-based:
 
-To represent the minimum measurement with 10 pixels for each unit system, I'll calculate the required zoom levels using the formula:
+## Approach to Creating a Truly Unit-Based Grid
 
-```javascript
-zoom = DESIRED_PIXELS / (minIncrement * unitToPixelRatio)
-```
+1. **Modify the Core Spacing Logic**
+   - Currently, `calculateGridSpacing()` is just helping determine a good visual spacing
+   - Need to rework this to calculate the actual physical grid spacing based on units and zoom
 
-Using 10 pixels (instead of the current 5) and assuming a standard pixelRatio of 1:
+2. **Implement Physical-to-Pixel Conversions**
+   - Define standard physical-to-pixel mappings (e.g., 72 DPI = 1 inch = 72 pixels)
+   - Use these conversions to determine the actual pixel spacing between grid lines
 
-### Points Units
-- Minimum increment: 1 point
-- unitToPixelRatio: 1 / 1 = 1
-- Required zoom: 10 / (1 * 1) = **10.0** wrong, more like: 
-- At this zoom level, 1 point = 10 pixels
+3. **Key Methods to Modify**
 
-### Imperial Units
-- Minimum increment: 1/16 inch = 0.0625 inches
-- unitToPixelRatio: 72 / 1 = 72
-- Required zoom: 10 / (0.0625 * 72) = 10 / 4.5 = **2.22** wrong, more like: 2500
-- At this zoom level, 1/16 inch = 10 pixels
+   ```javascript
+   // This method needs to truly calculate spacing based on physical units
+   calculateGridSpacing(units, zoom, pixelRatio, unitToPixelSize) {
+     // Return actual pixel spacing for the given unit
+     if (units === 'imperial') {
+       // For imperial, use standard divisions: 1", 1/2", 1/4", 1/8", 1/16"
+       return determineImperialSpacing(zoom, unitToPixelSize);
+     } else if (units === 'metric') {
+       // For metric, use standard divisions: 1mm, 2mm, 5mm, 1cm, 2cm, 5cm
+       return determineMetricSpacing(zoom, unitToPixelSize);
+     } else {
+       // For points, continue with current approach
+       return determinePointSpacing(zoom, unitToPixelSize);
+     }
+   }
+   ```
 
-### Metric Units
-- Minimum increment: 1 mm
-- unitToPixelRatio: 2.835 / 1 = 2.835
-- Required zoom: 10 / (1 * 2.835) = **3.53**
-- At this zoom level, 1 mm = 10 pixels
+4. **Unit-Specific Grid Divisions**
+   - Imperial should use fractional divisions (1", 1/2", 1/4", 1/8", etc.)
+   - Metric should use decimal divisions (1mm, 2mm, 5mm, 1cm, etc.)
+   - Points could continue using the current approach
 
-These zoom levels would ensure that the minimum measurement for each unit system is rendered with exactly 10 pixels on screen, making them clearly visible and usable.
+5. **Zoom Management**
+   - The zoom factor needs to correctly scale physical units
+   - At zoom = 1, physical measurements should match real-world sizes (e.g., 1 inch on screen = 1 inch in reality)
+
+6. **Ensure Label Consistency**
+   - Labels should correspond exactly to the unit divisions they represent
+   - For imperial: show fractions (1/4", 1/2", etc.)
+   - For metric: use appropriate prefixes (mm, cm) based on size
+
+7. **Provide Visual Indicators**
+   - Different styling for major vs. minor grid divisions
+   - Match common ruler/measuring tape conventions for each unit system
+
+This approach leverages your existing codebase while fundamentally changing how grid spacing works. The most significant changes would be to the `calculateGridSpacing()`, [updateConfiguration()](cci:1://file:///Users/ajoslin/Development/schematic/src/grid/Grid.js:138:2-169:3), and [drawLines()](cci:1://file:///Users/ajoslin/Development/schematic/src/grid/Grid.js:314:2-383:3) methods to ensure they produce physically accurate grid spacings rather than just applying different labels.
+
+Would you prefer I focus on a specific aspect of this implementation first? For example, I could work on a new `calculateGridSpacing()` function that properly handles physical units.
