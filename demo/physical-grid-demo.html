@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Physical Grid Demo - Unit-Based Grid Spacing</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        font-family: Arial, sans-serif;
+      }
+      .controls {
+        padding: 10px;
+        background: #f0f0f0;
+        border-bottom: 1px solid #ccc;
+      }
+      .container {
+        display: flex;
+        flex: 1;
+      }
+      .grid-container {
+        flex: 1;
+        position: relative;
+        border: 1px solid #ccc;
+        overflow: hidden;
+      }
+      canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        cursor: grab;
+      }
+      canvas:active {
+        cursor: grabbing;
+      }
+      button {
+        padding: 8px 16px;
+        margin-right: 10px;
+        cursor: pointer;
+      }
+      select, button {
+        margin: 5px;
+      }
+      .coordinates {
+        margin-left: 20px;
+        font-family: monospace;
+      }
+      .info-panel {
+        position: absolute;
+        bottom: 10px;
+        right: 10px;
+        background: rgba(255,255,255,0.8);
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        font-family: monospace;
+        font-size: 12px;
+      }
+      .grid-info {
+        margin: 5px 0;
+      }
+    </style>
+    <!-- Load Fabric.js from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/fabric@6/dist/fabric.min.js"></script>
+  </head>
+  <body>
+    <div class="controls">
+      <h2>Physical Grid Demo: True Unit-Based Grid</h2>
+      
+      <div>
+        <label for="unit-select">Measurement Units:</label>
+        <select id="unit-select">
+          <option value="points">Points</option>
+          <option value="imperial">Imperial (inches)</option>
+          <option value="metric">Metric (mm)</option>
+        </select>
+        
+        <button id="reset-view">Reset View</button>
+        <button id="add-shape">Add Rectangle</button>
+      </div>
+      
+      <div>
+        <label>
+          <input type="checkbox" id="toggle-grid" checked>
+          Show Grid
+        </label>
+        <span class="coordinates" id="mouse-position">X: 0, Y: 0</span>
+      </div>
+    </div>
+    
+    <div class="container">
+      <div class="grid-container">
+        <canvas id="canvas"></canvas>
+        <div class="info-panel">
+          <div class="grid-info" id="grid-info">
+            Grid Units: Points<br>
+            Zoom: 1.0×
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <script type="module">
+      // Import our new PhysicalGrid class
+      import { PhysicalGrid } from '../src/grid/index.js';
+      
+      // Initialize Fabric.js canvas
+      const canvasEl = document.getElementById('canvas');
+      const fabricCanvas = new fabric.Canvas(canvasEl, {
+        selection: false,
+        preserveObjectStacking: true
+      });
+      
+      // Create grid instance
+      let grid;
+      
+      // Viewport and interaction state
+      const state = {
+        zoom: 1,
+        center: { x: 0, y: 0 },
+        isPanning: false,
+        lastPosX: 0,
+        lastPosY: 0,
+        showGrid: true,
+        units: 'points'
+      };
+      
+      // UI elements
+      const unitSelect = document.getElementById('unit-select');
+      const resetBtn = document.getElementById('reset-view');
+      const addShapeBtn = document.getElementById('add-shape');
+      const toggleGridBtn = document.getElementById('toggle-grid');
+      const mousePosition = document.getElementById('mouse-position');
+      const gridInfo = document.getElementById('grid-info');
+      
+      // Initialize the grid and canvas
+      function initializeGrid() {
+        // Get canvas context for the grid
+        const ctx = fabricCanvas.getContext();
+        
+        // Create PhysicalGrid instance
+        grid = new PhysicalGrid(ctx, {
+          units: state.units,
+          zoom: state.zoom
+        });
+        
+        // Resize handler
+        function resizeCanvas() {
+          const container = document.querySelector('.grid-container');
+          const width = container.offsetWidth;
+          const height = container.offsetHeight;
+          
+          fabricCanvas.setDimensions({ width, height });
+          grid.setSize(width, height);
+          
+          renderAll();
+        }
+        
+        // Initial size
+        resizeCanvas();
+        
+        // Handle window resize
+        window.addEventListener('resize', resizeCanvas);
+        
+        // Set up event handlers
+        setupEventHandlers();
+      }
+      
+      // Set up event handlers
+      function setupEventHandlers() {
+        // Unit selection
+        unitSelect.addEventListener('change', e => {
+          state.units = e.target.value;
+          grid.setUnits(state.units);
+          updateInfoPanel();
+          renderAll();
+        });
+        
+        // Reset view button
+        resetBtn.addEventListener('click', () => {
+          state.center = { x: 0, y: 0 };
+          state.zoom = 1;
+          updateZoom();
+          updateInfoPanel();
+          renderAll();
+        });
+        
+        // Add shape button
+        addShapeBtn.addEventListener('click', addRandomShape);
+        
+        // Toggle grid button
+        toggleGridBtn.addEventListener('change', e => {
+          state.showGrid = e.target.checked;
+          renderAll();
+        });
+        
+        // Mouse wheel for zoom
+        fabricCanvas.on('mouse:wheel', function(opt) {
+          const delta = opt.e.deltaY;
+          let zoom = state.zoom;
+          
+          // Zoom direction
+          zoom *= 0.999 ** delta;
+          
+          // Limit zoom
+          zoom = Math.min(Math.max(0.1, zoom), 20);
+          
+          // Store new zoom
+          state.zoom = zoom;
+          
+          // Update zoom
+          updateZoom();
+          
+          // Update info panel
+          updateInfoPanel();
+          
+          // Prevent page scrolling
+          opt.e.preventDefault();
+          opt.e.stopPropagation();
+        });
+        
+        // Mouse down to start panning
+        fabricCanvas.on('mouse:down', function(opt) {
+          // Only pan with right button or ctrl+left
+          if (opt.e.button === 2 || (opt.e.button === 0 && opt.e.ctrlKey)) {
+            this.isDragging = true;
+            this.selection = false;
+            this.lastPosX = opt.e.clientX;
+            this.lastPosY = opt.e.clientY;
+            opt.e.preventDefault();
+            opt.e.stopPropagation();
+          }
+        });
+        
+        // Mouse move for panning and coordinates
+        fabricCanvas.on('mouse:move', function(opt) {
+          // Show coordinates
+          updateMousePosition(opt.e);
+          
+          // Handle panning
+          if (this.isDragging) {
+            const e = opt.e;
+            const deltaX = e.clientX - this.lastPosX;
+            const deltaY = e.clientY - this.lastPosY;
+            
+            // Convert screen delta to grid units based on zoom
+            state.center.x -= deltaX / fabricCanvas.getZoom();
+            state.center.y += deltaY / fabricCanvas.getZoom(); // Y is inverted
+            
+            // Update last position
+            this.lastPosX = e.clientX;
+            this.lastPosY = e.clientY;
+            
+            // Render with new center
+            renderAll();
+          }
+        });
+        
+        // Mouse up to end panning
+        fabricCanvas.on('mouse:up', function(opt) {
+          this.isDragging = false;
+          this.selection = true;
+        });
+      }
+      
+      // Add a random shape to the canvas
+      function addRandomShape() {
+        // Random properties
+        const size = 50 + Math.random() * 50;
+        const x = (Math.random() * 400) - 200;
+        const y = (Math.random() * 400) - 200;
+        const color = `rgb(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)})`;
+        
+        // Create a rectangle
+        const rect = new fabric.Rect({
+          left: x,
+          top: y,
+          width: size,
+          height: size,
+          fill: color,
+          opacity: 0.7,
+          stroke: '#000',
+          strokeWidth: 1
+        });
+        
+        // Add to canvas
+        fabricCanvas.add(rect);
+        fabricCanvas.renderAll();
+      }
+      
+      // Update zoom in Fabric canvas
+      function updateZoom() {
+        fabricCanvas.setZoom(state.zoom);
+        grid.setZoom(state.zoom);
+        renderAll();
+      }
+      
+      // Update mouse position display
+      function updateMousePosition(e) {
+        // Get position relative to canvas
+        const rect = canvasEl.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        // Convert to grid coordinates
+        const zoom = fabricCanvas.getZoom();
+        const gridX = (x / zoom) - (fabricCanvas.width / 2 / zoom) + state.center.x;
+        const gridY = ((fabricCanvas.height - y) / zoom) - (fabricCanvas.height / 2 / zoom) + state.center.y;
+        
+        // Format based on units
+        let xFormatted, yFormatted;
+        switch (state.units) {
+          case 'imperial':
+            xFormatted = formatImperial(gridX);
+            yFormatted = formatImperial(gridY);
+            break;
+          case 'metric':
+            xFormatted = formatMetric(gridX);
+            yFormatted = formatMetric(gridY);
+            break;
+          default:
+            xFormatted = Math.round(gridX);
+            yFormatted = Math.round(gridY);
+        }
+        
+        // Update display
+        mousePosition.textContent = `X: ${xFormatted}, Y: ${yFormatted}`;
+      }
+      
+      // Format imperial measurements
+      function formatImperial(value) {
+        const absValue = Math.abs(value);
+        if (absValue >= 12) {
+          const feet = Math.floor(absValue / 12);
+          const inches = absValue % 12;
+          if (inches < 0.1) {
+            return `${value < 0 ? '-' : ''}${feet}'`;
+          } else {
+            return `${value < 0 ? '-' : ''}${feet}'${inches.toFixed(1)}"`;
+          }
+        } else {
+          return `${value.toFixed(1)}"`;
+        }
+      }
+      
+      // Format metric measurements
+      function formatMetric(value) {
+        const absValue = Math.abs(value);
+        if (absValue >= 1000) {
+          return `${(value / 1000).toFixed(2)}m`;
+        } else if (absValue >= 10) {
+          return `${(value / 10).toFixed(1)}cm`;
+        } else {
+          return `${value.toFixed(1)}mm`;
+        }
+      }
+      
+      // Update info panel
+      function updateInfoPanel() {
+        gridInfo.innerHTML = `Grid Units: ${state.units}<br>Zoom: ${state.zoom.toFixed(1)}×`;
+      }
+      
+      // Render the canvas and grid
+      function renderAll() {
+        // Update grid center
+        grid.updateViewport({
+          x: state.center.x,
+          y: state.center.y,
+          zoom: state.zoom,
+          unitToPixelSize: state.zoom
+        });
+        
+        // Render fabric objects
+        fabricCanvas.renderAll();
+        
+        // Draw grid
+        if (state.showGrid) {
+          grid.draw();
+        }
+      }
+      
+      // Handle context menu to prevent right-click menu
+      canvasEl.addEventListener('contextmenu', e => {
+        e.preventDefault();
+      });
+      
+      // Initialize and render
+      initializeGrid();
+      renderAll();
+    </script>
+  </body>
+</html>
