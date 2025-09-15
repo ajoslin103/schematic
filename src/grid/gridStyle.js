@@ -10,9 +10,21 @@ const gridStyle = {
   unit: 10,
   lines: (state) => {
     const coord = state.coordinate;
+    const grid = state.grid;
     
+    // IMPORTANT: Always use the distance value that was passed from the Grid class
+    // This ensures we respect the unit-specific grid spacing values
+    let effectiveDistance = coord.distance;
+    const units = grid?.units || 'points';
+    
+    // Log the distance value we're actually using
+    console.log(`[GridStyle] Generating grid lines with coord.distance=${effectiveDistance}, units=${units}, zoom=${coord.zoom}`);
+    
+    // Calculate step size based on the effective distance
     // eslint-disable-next-line no-multi-assign
-    const step = state.step = scale(coord.distance * coord.zoom, coord.steps);
+    const step = state.step = scale(effectiveDistance * coord.zoom, coord.steps);
+    
+    console.log(`[GridStyle] Calculated step size: ${step} for ${units} units`);
     
     const start = Math.floor(state.offset / step) * step;
     const end = Math.ceil((state.offset + state.range) / step + 1) * step;

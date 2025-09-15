@@ -70,6 +70,9 @@ class Grid extends Base {
   zoomEnabled = true;
   panEnabled = true;
   
+  // Internal flags
+  _skipAutoGridSpacing = false; // When true, don't auto-calculate grid spacing
+  
   // Label settings
   labels = true;
   fontSize = '11pt';
@@ -103,6 +106,20 @@ class Grid extends Base {
       formatValueByUnits: typeof formatValueByUnits === 'function',
       calculateGridSpacing: typeof calculateGridSpacing === 'function'
     });
+    
+    // Set the units property first to ensure proper grid spacing
+    if (opts && opts.units) {
+      this.units = opts.units;
+    }
+    
+    // Apply unit-specific default spacing based on current unit system
+    if (this.units === 'points') {
+      this.distance = 100; // Standard 100-point grid
+    } else if (this.units === 'imperial') {
+      this.distance = 72;  // 1 inch = 72 points
+    } else if (this.units === 'metric') {
+      this.distance = 28;  // 1 cm = 28 points
+    }
     
     this.setDefaults();
     this.updateConfiguration(opts);
@@ -141,24 +158,24 @@ class Grid extends Base {
     if (!opts) opts = {};
     const shape = [this.width, this.height];
     
-    // Update grid spacing based on units and zoom level
-    if (this.units && this.zoom) {
-      console.log(`[Grid] Calculating optimal spacing for units: ${this.units}, zoom: ${this.zoom}`);
-      
-      // Pass unitToPixelSize from FabricJS if available
-      const optimalSpacing = calculateGridSpacing(
-        this.units, 
-        this.zoom, 
-        this.pixelRatio, 
-        this.unitToPixelSize
-      );
-      
-      console.log(`[Grid] Optimal spacing calculated: ${optimalSpacing}`);
-      if (optimalSpacing > 0) {
-        this.distance = optimalSpacing;
-        console.log(`[Grid] Grid distance updated to: ${this.distance}`);
-      }
+    // Force unit-specific grid spacing values regardless of zoom level
+    // This ensures consistent grid spacing for each unit system
+    console.log(`[Grid] Using fixed grid spacing for units: ${this.units}`);
+    
+    // Always ensure the correct unit-specific grid spacing is applied
+    if (this.units === 'points' && this.distance !== 100) {
+      this.distance = 100;
+      console.log(`[Grid] Setting points grid spacing: ${this.distance}`);
+    } else if (this.units === 'imperial' && this.distance !== 72) {
+      this.distance = 72;
+      console.log(`[Grid] Setting imperial grid spacing: ${this.distance}`);
+    } else if (this.units === 'metric' && this.distance !== 28) {
+      this.distance = 28;
+      console.log(`[Grid] Setting metric grid spacing: ${this.distance}`);
     }
+    
+    console.log(`[Grid] Using fixed grid spacing: ${this.distance} ${this.units}`);
+
 
     // recalc state
     this.state.x = this.calcCoordinate(this.axisX, shape, this);
@@ -177,17 +194,13 @@ class Grid extends Base {
     // Store unitToPixelSize if provided by FabricJS
     if (center.unitToPixelSize !== undefined) {
       this.unitToPixelSize = center.unitToPixelSize;
-      // console.log(`[Grid] Received unitToPixelSize: ${this.unitToPixelSize} (pixels per unit at current zoom)`); 
       
-      // Critical test for unit conversion - this will verify our scaling fix
-      if (this.units === 'imperial') {
-        // Test conversion of 100 points
-        const testPoints = 100;
-        const testInches = testPoints / 72; // Standard conversion: 72 points = 1 inch
-        console.log(`[Grid-TESTCONV] ${testPoints} points = ${testInches.toFixed(2)} inches`);
-        console.log(`[Grid-TESTCONV] For reference: 100 pixels should be about 1.39 inches, not 8'4"`);
-        console.log(`[Grid-TESTCONV] Current unitToPixelSize: ${this.unitToPixelSize} pixels per ${this.units} unit`);
-      }
+      // IMPORTANT: We're removing the auto-adjustment of grid distance here.
+      // Instead, we'll rely on the unit-specific values set during setUnits() and calculateGridSpacing()
+      // This ensures the grid spacing stays consistent for each unit system.
+      
+      // Just log the current grid spacing for debugging
+      console.log(`[Grid] Current grid spacing in ${this.units}: ${this.distance} (not auto-adjusted)`); 
     }
     
     // recalc state
@@ -245,8 +258,16 @@ class Grid extends Base {
       format: v => v
     };
     
-    // Apply grid style and user options
-    this.defaults = Object.assign({}, baseDefaults, gridStyle, this._options);
+    // Create a custom grid style with unit-specific distance value
+    const customGridStyle = Object.assign({}, gridStyle, {
+      // Override the distance value with our unit-specific value
+      distance: this.distance
+    });
+    
+    console.log(`[Grid-DEBUG] Setting up grid with distance: ${this.distance} for units: ${this.units}`);
+    
+    // Apply grid style and user options, ensuring our unit-specific distance is used
+    this.defaults = Object.assign({}, baseDefaults, customGridStyle, this._options);
     
     // Initialize axes
     this.axisX = Object.assign(new Axis('x', this.defaults), {
@@ -404,10 +425,37 @@ class Grid extends Base {
     // Store new units
     this.units = units;
     
-    // Convert grid spacing to the new unit system
-    console.log(`[Grid] Converting units from ${prevUnits} to ${units}, distance before: ${this.distance}`);
-    this.distance = convertDistance(this.distance, prevUnits, units);
-    console.log(`[Grid] After conversion: distance = ${this.distance}`);
+    // Reset to default grid spacing based on unit system rather than converting
+    // This ensures we're using natural increments for the selected unit system
+    if (units === 'points') {
+      // Default grid spacing for points
+      this.distance = 100; // Standard 100-point grid
+    } else if (units === 'imperial') {
+      // Default grid spacing for imperial - 1 inch (72 points)
+      this.distance = 72; // 1 inch grid
+    } else if (units === 'metric') {
+      // Default grid spacing for metric - 10 mm
+      this.distance = 28; // 1 cm grid
+    }
+    console.log(`[Grid] Switched units from ${prevUnits} to ${units}, new grid spacing: ${this.distance}`);
+    
+    // Propagate unit change to axes
+    if (this.axisX) {
+      if (typeof this.axisX.setUnits === 'function') {
+        this.axisX.setUnits(units);
+      } else {
+        this.axisX.units = units;
+      }
+      this.axisX.distance = this.distance;
+    }
+    if (this.axisY) {
+      if (typeof this.axisY.setUnits === 'function') {
+        this.axisY.setUnits(units);
+      } else {
+        this.axisY.units = units;
+      }
+      this.axisY.distance = this.distance;
+    }
     
     // Update max zoom based on minimum natural increments
     const previousMaxZoom = this.maxZoom;
@@ -420,9 +468,15 @@ class Grid extends Base {
       this.zoom = this.maxZoom;
     }
     
+    // Temporarily disable auto grid spacing calculation
+    this._skipAutoGridSpacing = true;
+    
     // Update configuration and render the grid
     this.updateConfiguration();
     this.render();
+    
+    // Re-enable auto grid spacing for future updates
+    this._skipAutoGridSpacing = false;
     
     // Emit a custom event that will trigger the parent Map to update completely
     const event = new CustomEvent('grid-units-changed', { detail: { units: units } });

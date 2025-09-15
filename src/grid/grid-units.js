@@ -199,6 +199,20 @@ export function scaleByUnits(minStep, units) {
 }
 
 export function calculateGridSpacing(units, zoom, pixelRatio, unitToPixelSize) {
+  // Use unit-specific fixed grid spacing instead of calculating dynamically
+  // This ensures consistent grid spacing across unit systems
+  if (units === 'points') {
+    console.log('[grid-units] Using fixed points grid spacing: 100');
+    return 100; // Standard 100-point grid
+  } else if (units === 'imperial') {
+    console.log('[grid-units] Using fixed imperial grid spacing: 72');
+    return 72;  // 1 inch = 72 points
+  } else if (units === 'metric') {
+    console.log('[grid-units] Using fixed metric grid spacing: 28');
+    return 28;  // 1 cm = 28 points (approx)
+  }
+  
+  // If we reach here, fallback to the original dynamic calculation
   // Determine how many pixels a unit takes at current zoom
   let pixelsPerUnit;
   
@@ -216,6 +230,7 @@ export function calculateGridSpacing(units, zoom, pixelRatio, unitToPixelSize) {
   
   // Use our unit-specific scale function to get the appropriate natural increment
   const bestIncrement = scaleByUnits(idealUnitSpacing, units);
+  console.log(`[grid-units] Using calculated grid spacing: ${bestIncrement} for ${units}`);
   
   return bestIncrement;
 }

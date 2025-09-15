@@ -253,7 +253,7 @@ export class Map extends Base {
         }
 
         // Calculate the properly scaled pixel size based on unit system
-        const scaledPixelSize = measuredPixels / unitScaleFactor;
+        const scaledPixelSize = measuredPixels;
         
         // Detailed logging to verify unit scaling is working correctly
         // console.log(`[Map] ===== UNIT CONVERSION INFO =====`);

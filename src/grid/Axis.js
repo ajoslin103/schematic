@@ -2,6 +2,7 @@ class Axis {
   constructor(orientation, options) {
     Object.assign(this, options);
     this.orientation = orientation || 'x';
+    this.units = options.units || 'points';
   }
 
   getCoords(values) {
@@ -29,6 +30,13 @@ class Axis {
 
   setOffset(offset) {
     this.offset = offset;
+  }
+  
+  setUnits(units) {
+    if (this.units !== units) {
+      console.log(`[Axis] Units changed from ${this.units} to ${units}`);
+      this.units = units;
+    }
   }
 
   update(options) {
