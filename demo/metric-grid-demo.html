@@ -325,10 +325,13 @@
       document.getElementById('btn-zoom-in').addEventListener('click', () => {
         const zoom = Math.min(window.gridState.zoom * 1.2, 10);
         window.gridState.zoom = zoom;
-        fabricCanvas.zoomToPoint(
-          new fabric.Point(fabricCanvas.width / 2, fabricCanvas.height / 2),
-          zoom
-        );
+        
+        // Find the grid origin (0,0) in screen space
+        const originPoint = new fabric.Point(0, 0);  // Grid origin point
+        const screenPoint = fabric.util.transformPoint(originPoint, fabricCanvas.viewportTransform);
+        
+        // Zoom to the grid origin
+        fabricCanvas.zoomToPoint(screenPoint, zoom);
         fabricCanvas.requestRenderAll();
       });
       
@@ -336,10 +339,13 @@
       document.getElementById('btn-zoom-out').addEventListener('click', () => {
         const zoom = Math.max(window.gridState.zoom / 1.2, 0.1);
         window.gridState.zoom = zoom;
-        fabricCanvas.zoomToPoint(
-          new fabric.Point(fabricCanvas.width / 2, fabricCanvas.height / 2),
-          zoom
-        );
+        
+        // Find the grid origin (0,0) in screen space
+        const originPoint = new fabric.Point(0, 0);  // Grid origin point
+        const screenPoint = fabric.util.transformPoint(originPoint, fabricCanvas.viewportTransform);
+        
+        // Zoom to the grid origin
+        fabricCanvas.zoomToPoint(screenPoint, zoom);
         fabricCanvas.requestRenderAll();
       });
       
@@ -370,7 +376,8 @@
           const deltaY = opt.e.clientY - lastPosY;
           lastPosX = opt.e.clientX;
           lastPosY = opt.e.clientY;
-          fabricCanvas.relativePan(new fabric.Point(deltaX, deltaY));
+          // Invert deltaY to correct vertical panning direction
+          fabricCanvas.relativePan(new fabric.Point(deltaX, -deltaY));
         }
       });
       
@@ -398,9 +405,10 @@
         
         window.gridState.zoom = zoom;
         
-        // Zoom to cursor position
+        // Zoom to cursor position, maintaining the origin
         const point = new fabric.Point(opt.e.offsetX, opt.e.offsetY);
         fabricCanvas.zoomToPoint(point, zoom);
+        fabricCanvas.requestRenderAll();
       });
       
       // Prevent default context menu
