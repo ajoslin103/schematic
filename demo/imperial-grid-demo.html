@@ -11,6 +11,47 @@
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     }
     
+    .calibration-controls {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin: 10px 0;
+      flex-wrap: wrap;
+    }
+    
+    #calibration-value {
+      min-width: 40px;
+      text-align: center;
+      font-weight: bold;
+    }
+    
+    .calibration-help {
+      font-size: 0.8em;
+      color: #666;
+      flex: 1;
+      margin-left: 5px;
+    }
+    
+    .keyboard-hint {
+      font-style: italic;
+      margin-left: 5px;
+    }
+    
+    .reference-box {
+      position: absolute;
+      border: 2px solid #e74c3c;
+      background-color: rgba(231, 76, 60, 0.1);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #e74c3c;
+      font-weight: bold;
+      font-size: 11px;
+      pointer-events: none;
+      transform-origin: left top;
+    }
+    
     #container {
       display: flex;
       flex-direction: column;
@@ -78,6 +119,7 @@
   <div id="container">
     <div class="canvas-container">
       <canvas id="canvas"></canvas>
+      <div class="reference-box" id="inch-reference">1 inch</div>
       <div class="info-panel">
         <div>Zoom: <span id="zoom-level">1.0</span>x</div>
         <div>Units: <span id="units">Imperial</span></div>
@@ -87,6 +129,16 @@
       <button id="btn-zoom-in">Zoom In (+)</button>
       <button id="btn-zoom-out">Zoom Out (-)</button>
       <button id="btn-reset">Reset View</button>
+      <div class="calibration-controls">
+        <span>Calibration: </span>
+        <button id="btn-calibrate-down">-</button>
+        <span id="calibration-value">100%</span>
+        <button id="btn-calibrate-up">+</button>
+        <div class="calibration-help">
+          Hold a ruler to your screen and adjust until 1" on screen matches 1" on ruler
+          <span class="keyboard-hint">(Alt+Arrows for fine control)</span>
+        </div>
+      </div>
       <div class="status" id="status">Imperial Grid with inch-based measurements</div>
     </div>
   </div>
@@ -136,14 +188,98 @@
         y: -fabricCanvas.height / 2 + 100
       });
       
-      // Define constants for the imperial grid
-      const DPI = 96;  // Default pixels per inch
-      const POINTS_PER_INCH = 96; // Standard conversion
+      // Define variables for the imperial grid
+      const STANDARD_DPI = 96;  // Default pixels per inch
+      let calibrationFactor = 1.0; // Calibration factor (1.0 = 100%)
+      let effectiveDpi = STANDARD_DPI * calibrationFactor; // Adjusted DPI
       
-      // Store global state
-      window.gridState = {
-        zoom: 1
+      // Store the initial effective DPI to keep reference box size consistent
+      const initialEffectiveDpi = effectiveDpi;
+      
+      // Function to update the reference box size and position
+      const updateReferenceBox = () => {
+        // Only update if grid state exists and zoom is defined
+        if (!window.gridState || typeof window.gridState.zoom === 'undefined') return;
+        
+        const referenceBox = document.getElementById('inch-reference');
+        // Use initialEffectiveDpi to keep reference box size consistent regardless of grid calibration changes
+        const boxWidth = initialEffectiveDpi * window.gridState.zoom;
+        const boxHeight = boxWidth / 4; // Make it a rectangle with 1:4 ratio
+        
+        // Set the dimensions
+        referenceBox.style.width = `${boxWidth}px`;
+        referenceBox.style.height = `${boxHeight}px`;
+        
+        // Get container width to position the reference box
+        const containerWidth = container.clientWidth;
+        
+        // Position it at 10% from the left of the viewport
+        referenceBox.style.left = `${containerWidth * 0.1}px`;
+        referenceBox.style.top = `20px`; // Fixed padding from the top
       };
+      
+      // Function to update calibration
+      const updateCalibration = (newFactor) => {
+        // Limit to reasonable range (50% to 200%)
+        calibrationFactor = Math.max(0.5, Math.min(2.0, newFactor));
+        effectiveDpi = STANDARD_DPI * calibrationFactor;
+        
+        // Update display
+        document.getElementById('calibration-value').textContent = `${Math.round(calibrationFactor * 100)}%`;
+        document.getElementById('units').textContent = `Imperial (${Math.round(effectiveDpi)} px/inch)`;
+        
+        // No need to update reference box as it now uses initialEffectiveDpi
+        // which doesn't change with calibration
+        
+        // Redraw grid
+        fabricCanvas.requestRenderAll();
+      };
+      
+      // Add calibration adjustment button handlers
+      document.getElementById('btn-calibrate-up').addEventListener('click', () => {
+        updateCalibration(calibrationFactor + 0.01); // Increase by 1%
+      });
+      
+      document.getElementById('btn-calibrate-down').addEventListener('click', () => {
+        updateCalibration(calibrationFactor - 0.01); // Decrease by 1%
+      });
+      
+      // Add keyboard shortcuts for calibration
+      window.addEventListener('keydown', (e) => {
+        // Only respond to arrow keys when Alt key is pressed
+        if (e.altKey) {
+          switch(e.key) {
+            case 'ArrowUp':
+              e.preventDefault();
+              updateCalibration(calibrationFactor + 0.01); // +1%
+              break;
+            case 'ArrowDown':
+              e.preventDefault();
+              updateCalibration(calibrationFactor - 0.01); // -1%
+              break;
+            case 'ArrowRight':
+              e.preventDefault();
+              updateCalibration(calibrationFactor + 0.001); // +0.1% (finer adjustment)
+              break;
+            case 'ArrowLeft':
+              e.preventDefault();
+              updateCalibration(calibrationFactor - 0.001); // -0.1% (finer adjustment)
+              break;
+          }
+        }
+      });
+      
+      // Store global state first
+      window.gridState = {
+        zoom: 1,
+        calibrationFactor: calibrationFactor
+      };
+      
+      // Now set initial calibration display
+      updateCalibration(calibrationFactor);
+      
+      // Initialize reference box position and size
+      updateReferenceBox();
       
       // Grid colors
       const gridColor = 'rgba(0,0,0,0.2)';
@@ -169,11 +305,11 @@
         const centerY = (height / 2 - vpt[5]) / vpt[3];
         
         // Calculate grid cell size in pixels (1 inch at current zoom)
-        const gridSize = DPI * zoom;
+        const gridSize = effectiveDpi * zoom;
         
         // Calculate visible area in screen coordinates
-        const viewportLeft = -centerX * zoom * (DPI / POINTS_PER_INCH);
-        const viewportTop = centerY * zoom * (DPI / POINTS_PER_INCH);
+        const viewportLeft = -centerX * zoom;
+        const viewportTop = centerY * zoom;
         
         // Calculate grid range to cover viewport
         const startX = Math.floor((-viewportLeft) / gridSize) - 1;
@@ -319,6 +455,19 @@
         document.getElementById('zoom-level').textContent = zoom.toFixed(2);
       });
       
+      // Initial grid setup with default zoom level
+      let lastZoom = window.gridState.zoom;
+      fabricCanvas.on('after:render', () => {
+        const zoom = window.gridState.zoom;
+        document.getElementById('zoom-level').textContent = zoom.toFixed(2);
+        
+        // Only update reference box when zoom changes to avoid unnecessary recalculations
+        if (zoom !== lastZoom) {
+          updateReferenceBox();
+          lastZoom = zoom;
+        }
+      });
+      
       // Zoom in button
       document.getElementById('btn-zoom-in').addEventListener('click', () => {
         const zoom = Math.min(window.gridState.zoom * 1.2, 10);
@@ -350,7 +499,11 @@
       // Reset view button
       document.getElementById('btn-reset').addEventListener('click', () => {
         window.gridState.zoom = 1;
-        fabricCanvas.setViewportTransform([1, 0, 0, 1, fabricCanvas.width / 2, fabricCanvas.height / 2]);
+        fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+        fabricCanvas.absolutePan({
+          x: -fabricCanvas.width / 2 - 100,
+          y: -fabricCanvas.height / 2 + 100
+        });
         fabricCanvas.requestRenderAll();
       });
       
