@@ -405,9 +405,12 @@
         
         window.gridState.zoom = zoom;
         
-        // Zoom to cursor position, maintaining the origin
-        const point = new fabric.Point(opt.e.offsetX, opt.e.offsetY);
-        fabricCanvas.zoomToPoint(point, zoom);
+        // Find the grid origin (0,0) in screen space - same as zoom buttons
+        const originPoint = new fabric.Point(0, 0);  // Grid origin point
+        const screenPoint = fabric.util.transformPoint(originPoint, fabricCanvas.viewportTransform);
+        
+        // Zoom to the grid origin instead of cursor position
+        fabricCanvas.zoomToPoint(screenPoint, zoom);
         fabricCanvas.requestRenderAll();
       });
       
