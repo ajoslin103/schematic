@@ -37,6 +37,40 @@
       margin-left: 5px;
     }
     
+    /* Dialog Styles */
+    dialog {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 20px;
+      max-width: 500px;
+      width: 90%;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    dialog::backdrop {
+      background-color: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(2px);
+    }
+    
+    .dialog-buttons {
+      margin-top: 20px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+    
+    .dialog-buttons button {
+      padding: 8px 16px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #f0f0f0;
+      cursor: pointer;
+    }
+    
+    .dialog-buttons button:hover {
+      background: #e0e0e0;
+    }
+    
     .reference-box {
       position: absolute;
       border: 2px solid #3498db;
@@ -132,6 +166,7 @@
       <button id="btn-zoom-in">Zoom In (+)</button>
       <button id="btn-zoom-out">Zoom Out (-)</button>
       <button id="btn-reset">Reset View</button>
+      <button id="btn-skedaddle">Skedaddle</button>
       <div class="calibration-controls">
         <span>Calibration: </span>
         <button id="btn-calibrate-down">-</button>
@@ -144,6 +179,15 @@
       </div>
       <div class="status" id="status">Imperial Grid with inch-based measurements</div>
     </div>
+    
+    <!-- Skedaddle Dialog -->
+    <dialog id="skedaddle-dialog">
+      <h2>Time to Skedaddle!</h2>
+      <p>This is a modern HTML dialog. Click outside or press Escape to close.</p>
+      <div class="dialog-buttons">
+        <button id="close-dialog">Close</button>
+      </div>
+    </dialog>
   </div>
 
   <!-- Load Fabric.js first -->
@@ -274,6 +318,37 @@
           }
         }
       });
+      
+      // Skedaddle Dialog functionality
+      const skedaddleBtn = document.getElementById('btn-skedaddle');
+      const skedaddleDialog = document.getElementById('skedaddle-dialog');
+      const closeDialogBtn = document.getElementById('close-dialog');
+      
+      if (skedaddleBtn && skedaddleDialog) {
+        skedaddleBtn.addEventListener('click', () => {
+          skedaddleDialog.showModal();
+        });
+        
+        // Close dialog when clicking the close button
+        if (closeDialogBtn) {
+          closeDialogBtn.addEventListener('click', () => {
+            skedaddleDialog.close();
+          });
+        }
+        
+        // Close when clicking outside the dialog
+        skedaddleDialog.addEventListener('click', (e) => {
+          const dialogDimensions = skedaddleDialog.getBoundingClientRect();
+          if (
+            e.clientX < dialogDimensions.left ||
+            e.clientX > dialogDimensions.right ||
+            e.clientY < dialogDimensions.top ||
+            e.clientY > dialogDimensions.bottom
+          ) {
+            skedaddleDialog.close();
+          }
+        });
+      }
       
       // Store global state
       window.gridState = {
