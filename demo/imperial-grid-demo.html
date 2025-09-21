@@ -234,10 +234,14 @@
     <dialog id="calibration-dialog">
       <div class="dialog-content">
         <h2 style="margin-top: 0; color: #2c3e50;">Screen Calibration</h2>
-        <p>Adjust the lines to match the height of a credit card</p>
         
-        <div id="dialog-reference" style="margin: 0 auto; position: relative; background: transparent;">
-          <!-- Label will be added by JavaScript -->
+        <div id="dialog-reference" style="margin: 0 auto; position: relative; background: transparent; min-height: 200px; display: flex; align-items: center; justify-content: center;">
+          <div id="dialog-reference-text" style="text-align: center; width: 100%; margin-top: 30px;">
+            <p>In order to determine the resolution of your screen.</p> 
+            <p>We will use a standard sized object that most people have on hand.</p>
+            <p>Please hold a bank card against the screen.</p>
+            <p>And adjust the lines to match the height.</p>
+          </div>
         </div>
         
         <div style="margin: 20px 0;">
@@ -337,37 +341,8 @@
           // Calculate height based on reference scale and card dimensions
           const dialogHeight = Math.round(cardHeightInches * pixelsPerInch * referenceScale);
           
-          console.log('Setting dialog dimensions:', { 
-            width: dialogWidth, 
-            height: dialogHeight, 
-            referenceScale,
-            aspectRatio: cardAspectRatio 
-          });
-          
-          // Clear any previous content
-          dialogReferenceBox.innerHTML = '';
-          
-          // Create the label
-          const label = document.createElement('div');
-          label.className = 'reference-label';
-          label.textContent = `${cardHeightInches}" height (${Math.round(referenceScale * 100)}%)`;
-          Object.assign(label.style, {
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            whiteSpace: 'nowrap',
-            fontSize: '14px',
-            color: '#4a6fa5',
-            fontWeight: '500',
-            background: 'white',
-            padding: '2px 8px',
-            borderRadius: '4px',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-          });
-          
-          // Append the label
-          dialogReferenceBox.appendChild(label);
+          // // Clear any previous content
+          // dialogReferenceBox.innerHTML = '';
           
           // Set all styles at once to avoid conflicts
           Object.assign(dialogReferenceBox.style, {
