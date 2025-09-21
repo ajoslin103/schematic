@@ -230,38 +230,8 @@
       <div class="status" id="status">Imperial Grid with inch-based measurements</div>
     </div>
     
-    <!-- Calibration Dialog -->
-    <dialog id="calibration-dialog">
-      <div class="dialog-content">
-        <h2 style="margin-top: 0; color: #2c3e50;">Screen Calibration</h2>
-        
-        <div id="dialog-reference" style="margin: 0 auto; position: relative; background: transparent; min-height: 200px; display: flex; align-items: center; justify-content: center;">
-          <div id="dialog-reference-text" style="text-align: center; width: 100%; margin-top: 30px;">
-            <p>In order to determine the resolution of your screen.</p> 
-            <p>We will use a standard sized object that most people have on hand.</p>
-            <p>Please hold a bank card against the screen.</p>
-            <p>And adjust the lines to match the height.</p>
-          </div>
-        </div>
-        
-        <div style="margin: 20px 0;">
-          <div style="display: flex; justify-content: center; align-items: center; gap: 20px; margin-bottom: 10px;">
-            <button id="calibrate-down" style="width: 50px; height: 50px; font-size: 24px; border-radius: 50%;">−</button>
-            
-            <div style="min-width: 80px; text-align: center;">
-              <div style="font-size: 1.4em; font-weight: bold;" id="calibration-percent">100%</div>
-            </div>
-            
-            <button id="calibrate-up" style="width: 50px; height: 50px; font-size: 24px; border-radius: 50%;">+</button>
-          </div>
-        </div>
-        
-        <div class="dialog-buttons">
-          <button id="reset-calibration" class="secondary">Reset</button>
-          <button id="close-calibration">Looks Good</button>
-        </div>
-      </div>
-    </dialog>
+    <!-- Calibration Dialog Container -->
+    <div id="calibration-dialog-container"></div>
   </div>
 
   <!-- Load Fabric.js first -->
@@ -410,6 +380,21 @@
         }
       });
       
+      // Load dialog content and initialize
+      async function loadDialogContent() {
+        try {
+          const response = await fetch('calibration-dialog.html');
+          const html = await response.text();
+          const container = document.getElementById('calibration-dialog-container');
+          if (container) {
+            container.innerHTML = html;
+            initializeDialogs();
+          }
+        } catch (error) {
+          console.error('Error loading dialog content:', error);
+        }
+      }
+
       // Initialize dialogs and event listeners
       function initializeDialogs() {
         const calibrationDialog = document.getElementById('calibration-dialog');
@@ -490,8 +475,16 @@
         return { updateCalibrationDisplay };
       }
       
-      // Initialize dialogs and get the update function
-      const { updateCalibrationDisplay } = initializeDialogs();
+      // Load dialog content and initialize
+      loadDialogContent().then(() => {
+        // Initialize dialogs and get the update function
+        const { updateCalibrationDisplay } = initializeDialogs();
+        
+        // Store the update function globally if needed
+        if (updateCalibrationDisplay) {
+          window.updateCalibrationDisplay = updateCalibrationDisplay;
+        }
+      });
       
       // Store global state
       window.gridState = {
