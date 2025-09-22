@@ -11,6 +11,124 @@
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     }
     
+    .calibration-controls {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin: 10px 0;
+      flex-wrap: wrap;
+    }
+    
+    #calibration-value {
+      min-width: 40px;
+      text-align: center;
+      font-weight: bold;
+    }
+    
+    .calibration-help {
+      font-size: 0.8em;
+      color: #666;
+      flex: 1;
+      margin-left: 5px;
+    }
+    
+    .keyboard-hint {
+      font-style: italic;
+      margin-left: 5px;
+    }
+    
+    /* Calibration Button Styles */
+    .calibration-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 2px solid #3498db;
+      background: white;
+      color: #3498db;
+      font-size: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      padding: 0;
+      line-height: 1;
+    }
+    
+    .calibration-btn:hover {
+      background: #f0f7ff;
+      transform: scale(1.05);
+    }
+    
+    .calibration-btn:active {
+      transform: scale(0.95);
+    }
+    
+    kbd {
+      background: #f0f0f0;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      padding: 1px 5px;
+      font-family: monospace;
+      font-size: 0.9em;
+      box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+    }
+    
+    /* Dialog Styles */
+    dialog {
+      border: 1px solid #ccc;
+      border-radius: 12px;
+      padding: 25px;
+      max-width: 400px;
+      width: 90%;
+      margin: auto;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+      background: white;
+      box-sizing: border-box;
+      text-align: center;
+    }
+    
+    dialog::backdrop {
+      background-color: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(3px);
+    }
+    
+    .dialog-content {
+      padding: 10px;
+    }
+    
+    .dialog-buttons {
+      margin-top: 25px;
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+    }
+    
+    .dialog-buttons button {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 6px;
+      background: #4a6fa5;
+      color: white;
+      font-weight: 500;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background 0.2s;
+    }
+    
+    .dialog-buttons button:hover {
+      background: #3a5a8c;
+    }
+    
+    .dialog-buttons button.secondary {
+      background: #f0f0f0;
+      color: #333;
+    }
+    
+    .dialog-buttons button.secondary:hover {
+      background: #e0e0e0;
+    }
+    
     #container {
       display: flex;
       flex-direction: column;
@@ -87,8 +205,12 @@
       <button id="btn-zoom-in">Zoom In (+)</button>
       <button id="btn-zoom-out">Zoom Out (-)</button>
       <button id="btn-reset">Reset View</button>
+      <button id="btn-skedaddle">Calibration</button>
       <div class="status" id="status">Metric Grid with centimeter-based measurements</div>
     </div>
+    
+    <!-- Calibration Dialog Container -->
+    <div id="calibration-dialog-container"></div>
   </div>
 
   <!-- Load Fabric.js first -->
@@ -142,10 +264,221 @@
       const CM_PER_INCH = 2.54; // Standard conversion
       const PIXELS_PER_CM = DPI / CM_PER_INCH; // ~37.8 pixels per cm at 96 DPI
       
+      // Define variables for the metric grid
+      const STANDARD_DPI = 96;  // Default pixels per inch
+      
+      // Grid uses a fixed DPI that doesn't change
+      const gridDpi = STANDARD_DPI;
+      
+      // Reference box has its own scale factor for calibration
+      // Calculate scale to match 318px height for 5.4cm card height (credit card is 8.56cm × 5.4cm) 
+      const targetHeight = 318; // Target starting height in pixels
+      const cardHeightInCm = 5.4; // Credit card height in cm
+      const pixelsPerCm = PIXELS_PER_CM; // Calculated above
+      let referenceScale = 0; // Start at 0%
+      
+      // Function to update the dialog reference box
+      const updateReferenceBox = () => {
+        // Only update if grid state exists and zoom is defined
+        if (!window.gridState) return;
+        
+        const dialogReferenceBox = document.getElementById('dialog-reference');
+        
+        // Update the dialog reference box with fixed dimensions
+        if (dialogReferenceBox) {
+          // Credit card dimensions: 8.56cm × 5.4cm (aspect ratio ~1.585)
+          const cardAspectRatio = 8.56 / 5.4; // width / height
+          const cardHeightCm = 5.4;
+          const lineWidth = 200; // Fixed width for the horizontal lines in pixels
+          
+          // Calculate dimensions based on width (200px) and reference scale
+          const dialogWidth = 200; // Fixed width in pixels
+          // Calculate height based on reference scale and card dimensions
+          const dialogHeight = Math.round(cardHeightCm * pixelsPerCm * referenceScale);
+          
+          // Set all styles at once to avoid conflicts
+          Object.assign(dialogReferenceBox.style, {
+            width: `${dialogWidth}px`,
+            height: `${dialogHeight}px`,
+            borderTop: '2px solid #4a6fa5',
+            borderBottom: '2px solid #4a6fa5',
+            borderLeft: 'none',
+            borderRight: 'none',
+            position: 'relative',
+            background: 'transparent',
+            margin: '20px auto',
+            display: 'block',
+            overflow: 'visible',
+            boxSizing: 'border-box'
+          });
+        }
+      };
+      
+      // Function to update calibration
+      const updateCalibration = (newScale) => {
+        // Limit to reasonable range (50% to 200% of target scale)
+        referenceScale = Math.max(0.5, Math.min(2.0, newScale));
+        
+        // Update the grid state
+        if (window.gridState) {
+          window.gridState.referenceScale = referenceScale;
+        }
+        
+        // Update the reference box
+        updateReferenceBox();
+        
+        // Update the percentage display
+        if (window.gridState && window.gridState.baseScale) {
+          const percentage = Math.round((referenceScale / window.gridState.baseScale) * 100);
+          const calibrationPercent = document.getElementById('calibration-percent');
+          if (calibrationPercent) {
+            calibrationPercent.textContent = `${percentage}%`;
+          }
+        }
+      };
+      
+      // Add keyboard controls for fine adjustment
+      document.addEventListener('keydown', (e) => {
+        // Only handle if Alt key is pressed for fine control
+        if (e.altKey) {
+          switch(e.key) {
+            case 'ArrowUp':
+              e.preventDefault();
+              updateCalibration(referenceScale + 0.01); // +1%
+              break;
+            case 'ArrowDown':
+              e.preventDefault();
+              updateCalibration(referenceScale - 0.01); // -1%
+              break;
+            case 'ArrowRight':
+              e.preventDefault();
+              updateCalibration(referenceScale + 0.001); // +0.1% (finer adjustment)
+              break;
+            case 'ArrowLeft':
+              e.preventDefault();
+              updateCalibration(referenceScale - 0.001); // -0.1% (finer adjustment)
+              break;
+          }
+        }
+      });
+      
+      // Load dialog content and initialize
+      async function loadDialogContent() {
+        try {
+          const response = await fetch('calibration-dialog.html');
+          const html = await response.text();
+          const container = document.getElementById('calibration-dialog-container');
+          if (container) {
+            container.innerHTML = html;
+            initializeDialogs();
+          }
+        } catch (error) {
+          console.error('Error loading dialog content:', error);
+        }
+      }
+
+      // Initialize dialogs and event listeners
+      function initializeDialogs() {
+        const calibrationDialog = document.getElementById('calibration-dialog');
+        const closeCalibrationBtn = document.getElementById('close-calibration');
+        const calibrateUpBtn = document.getElementById('calibrate-up');
+        const calibrateDownBtn = document.getElementById('calibrate-down');
+        const resetCalibrationBtn = document.getElementById('reset-calibration');
+        const calibrationPercent = document.getElementById('calibration-percent');
+        const skedaddleBtn = document.getElementById('btn-skedaddle');
+            
+        // Make sure all required elements exist
+        if (!calibrationDialog || !closeCalibrationBtn || 
+            !calibrateUpBtn || !calibrateDownBtn || !resetCalibrationBtn || 
+            !calibrationPercent || !skedaddleBtn) {
+          console.error('Could not find all required dialog elements');
+          return;
+        }
+        
+        // Calculate the base scale for 100% (5.4cm at standard DPI)
+        const baseScale = 1.0; // 100% scale = actual size at standard DPI
+        
+        // Show calibration dialog when clicking the Skedaddle button
+        skedaddleBtn.addEventListener('click', () => {
+          // Set initial scale to match target height (318px)
+          const initialScale = targetHeight / (cardHeightInCm * pixelsPerCm);
+          // Store the initial scale as our 100% reference
+          window.gridState.baseScale = initialScale;
+          updateCalibration(initialScale);
+          // Update the reference box before showing the dialog
+          updateReferenceBox();
+          calibrationDialog.showModal();
+        });
+        
+        // Close calibration dialog
+        closeCalibrationBtn.addEventListener('click', () => {
+          calibrationDialog.close();
+        });
+        
+        // Calibration controls
+        calibrateUpBtn.addEventListener('click', () => {
+          updateCalibration(referenceScale + 0.01);
+          updateCalibrationDisplay();
+        });
+        
+        calibrateDownBtn.addEventListener('click', () => {
+          updateCalibration(referenceScale - 0.01);
+          updateCalibrationDisplay();
+        });
+        
+        resetCalibrationBtn.addEventListener('click', () => {
+          if (window.gridState && window.gridState.baseScale) {
+            updateCalibration(window.gridState.baseScale);
+            updateCalibrationDisplay();
+          } else {
+            // Fallback to 100% if baseScale isn't available
+            updateCalibration(1.0);
+          }
+        });
+        
+        // Close dialog when clicking outside
+        if (calibrationDialog) {
+          calibrationDialog.addEventListener('click', (e) => {
+            if (e.target === calibrationDialog) {
+              calibrationDialog.close();
+            }
+          });
+        }
+        
+        // Update the calibration display
+        function updateCalibrationDisplay() {
+          if (calibrationPercent && window.gridState && window.gridState.baseScale) {
+            const percentage = Math.round((referenceScale / window.gridState.baseScale) * 100);
+            calibrationPercent.textContent = `${percentage}%`;
+          }
+        }
+        
+        // Return the update function so it can be called from outside
+        return { updateCalibrationDisplay };
+      }
+      
+      // Load dialog content and initialize
+      loadDialogContent().then(() => {
+        // Initialize dialogs and get the update function
+        const { updateCalibrationDisplay } = initializeDialogs();
+        
+        // Store the update function globally if needed
+        if (updateCalibrationDisplay) {
+          window.updateCalibrationDisplay = updateCalibrationDisplay;
+        }
+      });
+      
       // Store global state
       window.gridState = {
-        zoom: 1
+        zoom: 1,
+        referenceScale: referenceScale
       };
+      
+      // Set initial calibration display
+      updateCalibration(referenceScale);
+      
+      // Initialize reference box position and size
+      updateReferenceBox();
       
       // Grid colors
       const gridColor = 'rgba(0,0,0,0.2)';
@@ -352,7 +685,11 @@
       // Reset view button
       document.getElementById('btn-reset').addEventListener('click', () => {
         window.gridState.zoom = 1;
-        fabricCanvas.setViewportTransform([1, 0, 0, 1, fabricCanvas.width / 2, fabricCanvas.height / 2]);
+        fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+        fabricCanvas.absolutePan({
+          x: -fabricCanvas.width / 2 - 100,
+          y: -fabricCanvas.height / 2 + 100
+        });
         fabricCanvas.requestRenderAll();
       });
       
