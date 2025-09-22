@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grid Demo with Calibration</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+    
+    #container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    
+    .canvas-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background-color: #f5f5f5;
+    }
+    
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    
+    .controls {
+      padding: 10px;
+      background-color: #f0f0f0;
+      border-top: 1px solid #ddd;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    
+    .controls button {
+      padding: 8px 16px;
+      font-size: 14px;
+      background-color: #4a90e2;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    
+    .controls button:hover {
+      background-color: #3a80d2;
+    }
+    
+    .status {
+      margin: 5px;
+      padding: 5px;
+      color: #666;
+      font-size: 14px;
+    }
+    
+    .info-panel {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background-color: rgba(255, 255, 255, 0.8);
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      font-size: 14px;
+      user-select: none;
+    }
+  </style>
+  <!-- Load the calibration dialog styles -->
+  <link rel="stylesheet" href="../src/components/calibration/styles.css">
+</head>
+<body>
+  <div id="container">
+    <div class="canvas-container">
+      <canvas id="canvas"></canvas>
+      <div class="info-panel">
+        <div>Zoom: <span id="zoom-level">1.0</span>x</div>
+        <div>Units: <span id="units">Imperial</span></div>
+      </div>
+    </div>
+    <div class="controls">
+      <button id="btn-zoom-in">Zoom In (+)</button>
+      <button id="btn-zoom-out">Zoom Out (-)</button>
+      <button id="btn-reset">Reset View</button>
+      <button id="btn-calibrate">Calibration</button>
+      <div class="status" id="status">Grid Demo with Calibration</div>
+    </div>
+    
+    <!-- Calibration Dialog Container -->
+    <div id="calibration-dialog-container"></div>
+  </div>
+
+  <!-- Load Fabric.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+  
+  <!-- Load the calibration dialog module -->
+  <script type="module">
+    import CalibrationDialog from '../src/components/calibration/index.js';
+    
+    document.addEventListener('DOMContentLoaded', () => {
+      // Get the canvas element
+      const canvas = document.getElementById('canvas');
+      const container = document.querySelector('.canvas-container');
+      
+      // Set canvas dimensions to match container
+      const updateCanvasSize = () => {
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+        
+        // Request grid redraw if fabric canvas exists
+        if (window.fabricCanvas) {
+          window.fabricCanvas.setWidth(canvas.width);
+          window.fabricCanvas.setHeight(canvas.height);
+          window.fabricCanvas.requestRenderAll();
+        }
+      };
+      
+      // Set initial size
+      updateCanvasSize();
+      
+      // Resize canvas when window size changes
+      window.addEventListener('resize', updateCanvasSize);
+      
+      // Initialize Fabric.js canvas
+      const fabricCanvas = new fabric.Canvas('canvas', {
+        preserveObjectStacking: true,
+        renderOnAddRemove: true,
+        fireRightClick: true, 
+        stopContextMenu: true
+      });
+      
+      // Store canvas globally
+      window.fabricCanvas = fabricCanvas;
+      
+      // Center the origin
+      fabricCanvas.absolutePan({
+        x: -fabricCanvas.width / 2 - 100,
+        y: -fabricCanvas.height / 2 + 100
+      });
+      
+      // Define constants for the grid
+      const STANDARD_DPI = 96;  // Default pixels per inch
+      
+      // Store global state
+      window.gridState = {
+        zoom: 1,
+        referenceScale: 0 // Will be set by calibration dialog
+      };
+      
+      // Initialize the calibration dialog
+      const calibrationDialogContainer = document.getElementById('calibration-dialog-container');
+      const calibrationBtn = document.getElementById('btn-calibrate');
+      
+      // Create a calibration dialog instance with imperial units
+      const calibrationDialog = new CalibrationDialog({
+        container: calibrationDialogContainer,
+        gridState: window.gridState,
+        system: 'imperial', // Can be 'imperial', 'metric', or 'points'
+        referenceObject: { width: 3.375, height: 2.125, unit: 'in' }, // Credit card dimensions
+        targetHeight: 318, // Target height in pixels
+        dpi: STANDARD_DPI
+      });
+      
+      // Set the calibration button as trigger
+      calibrationDialog.setTriggerButton(calibrationBtn);
+      
+      // Grid colors
+      const gridColor = 'rgba(0,0,0,0.2)';
+      const subgridColor = 'rgba(0,0,0,0.1)';
+      const fineGridColor = 'rgba(0,0,0,0.05)';
+      const axisColor = 'rgba(0,0,0,0.4)';
+      const labelColor = 'rgba(0,0,0,0.6)';
+      
+      // Add a before:render event handler to draw the grid
+      fabricCanvas.on('before:render', function() {
+        // Get current viewport state
+        const zoom = window.gridState.zoom;
+        const ctx = fabricCanvas.getContext();
+        const vpt = fabricCanvas.viewportTransform;
+        
+        if (!vpt) return;
+        
+        const width = fabricCanvas.width;
+        const height = fabricCanvas.height;
+        
+        // Calculate grid cell size in pixels (1 inch at current zoom)
+        const gridSize = STANDARD_DPI * zoom;
+        
+        // Draw grid implementation would go here
+        // This is a simplified example
+        
+        // Update zoom level display
+        document.getElementById('zoom-level').textContent = zoom.toFixed(2);
+      });
+      
+      // Zoom in button
+      document.getElementById('btn-zoom-in').addEventListener('click', () => {
+        const zoom = Math.min(window.gridState.zoom * 1.2, 10);
+        window.gridState.zoom = zoom;
+        fabricCanvas.zoomToPoint(new fabric.Point(width / 2, height / 2), zoom);
+        fabricCanvas.requestRenderAll();
+      });
+      
+      // Zoom out button
+      document.getElementById('btn-zoom-out').addEventListener('click', () => {
+        const zoom = Math.max(window.gridState.zoom / 1.2, 0.1);
+        window.gridState.zoom = zoom;
+        fabricCanvas.zoomToPoint(new fabric.Point(width / 2, height / 2), zoom);
+        fabricCanvas.requestRenderAll();
+      });
+      
+      // Reset view button
+      document.getElementById('btn-reset').addEventListener('click', () => {
+        window.gridState.zoom = 1;
+        fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+        fabricCanvas.absolutePan({
+          x: -fabricCanvas.width / 2 - 100,
+          y: -fabricCanvas.height / 2 + 100
+        });
+        fabricCanvas.requestRenderAll();
+      });
+      
+      // Status update
+      document.getElementById('status').textContent = "Grid Demo ready - calibration enabled";
+    });
+  </script>
+</body>
+</html>
