@@ -37,8 +37,13 @@
     <script src="https://cdn.jsdelivr.net/npm/fabric@6/dist/index.min.js"></script>
     <!-- Load UMD build of schematic to avoid CORS issues in browser -->
     <script src="../dist/schematic.umd.js"></script>
+    <!-- Load the calibration dialog styles -->
+    <link rel="stylesheet" href="../src/components/calibration/styles.css">
   </head>
 <body>
+  <!-- Calibration Dialog Container -->
+  <div id="calibration-dialog-container"></div>
+  
   <div class="controls">
     <div style="margin-bottom:15px;">
       Schematic: The IndoorJs Grid as a FabricJS library, facilitates working above coordinate planes
@@ -85,6 +90,7 @@
       <div style="margin-bottom:15px;">
         <span id="coordinates">X: 0, Y: 0</span>
         <span id="zoomLevel" style="margin-left: 20px; font-family: monospace;">Zoom: 1.00x</span>
+        <span id="pixelRatio" style="margin-left: 20px; font-family: monospace;">Device Pixel Ratio: 1.0</span>
         <div id="docs" style="margin-left: 20px; font-family: monospace; font-style: italic;">
           <br> Use mouse wheel to zoom in/out.
           <br> Hold ALT key to zoom on cursor.
@@ -100,12 +106,17 @@
             <option value="metric">Metric</option>
           </select>
         </label>
+        <button id="btn-calibrate" style="margin-left: 15px;">Calibration</button>
       </div>
     </div>
     <div id="canvas-container"></div>
     
-    <!-- Use globals exposed by UMD build -->
-    <script>
+    <!-- Module imports for calibration -->
+    <script type="module">
+      // Import calibration dialog
+      import CalibrationDialog from '../src/components/calibration/index.js';
+      
+      // Import Schematic from UMD build
       const { Grid, Schematic } = window.Schematic;
 
       document.addEventListener('DOMContentLoaded', () => {
@@ -281,6 +292,15 @@
             document.getElementById('zoomLevel').textContent = zoomLevel;
           }
           
+          // Update device pixel ratio display
+          if (document.getElementById('pixelRatio')) {
+            // Use calibrated pixel ratio if available, otherwise use reported ratio
+            const reportedRatio = window.devicePixelRatio || 1;
+            const calibratedRatio = window.calibratedDPR || reportedRatio;
+            document.getElementById('pixelRatio').textContent = 
+              `Device Pixel Ratio: ${calibratedRatio.toFixed(3)} (Reported: ${reportedRatio.toFixed(3)})`;
+          }
+          
           // Coordinates are updated live from mouse:move
         }
 
@@ -319,6 +339,64 @@
         unitsSelect?.addEventListener('change', syncUnits);
         // Initialize units on load
         syncUnits();
+        
+        // Initialize calibration dialog
+        const calibrationDialogContainer = document.getElementById('calibration-dialog-container');
+        const calibrateBtn = document.getElementById('btn-calibrate');
+        
+        // Create calibration dialog instance with appropriate unit system
+        const calibrationDialog = new CalibrationDialog({
+          container: calibrationDialogContainer,
+          gridState: window.gridState || {}, // Create if it doesn't exist
+          system: unitsSelect?.value || 'points', // Use current units selection
+          targetHeight: 318, // Target height in pixels
+          dpi: 96, // Standard DPI
+          onCalibrationComplete: (result) => {
+            // Store the calculated device pixel ratio globally
+            window.calibratedDPR = result.calculatedDPR;
+            
+            // Update the display to show the new calibrated ratio
+            updateUIDisplay();
+            
+            // Log the calibration results
+            console.log('Calibration completed:', result);
+          }
+        });
+        
+        // Set trigger button
+        calibrationDialog.setTriggerButton(calibrateBtn);
+        
+        // Update calibration when units change
+        unitsSelect?.addEventListener('change', () => {
+          // Recreate calibration with new units
+          const newCalibration = new CalibrationDialog({
+            container: calibrationDialogContainer,
+            gridState: window.gridState || {},
+            system: unitsSelect.value,
+            targetHeight: 318,
+            dpi: 96,
+            onCalibrationComplete: (result) => {
+              // Store the calculated device pixel ratio globally
+              window.calibratedDPR = result.calculatedDPR;
+              
+              // Update the display to show the new calibrated ratio
+              updateUIDisplay();
+              
+              // Log the calibration results
+              console.log('Calibration completed:', result);
+            }
+          });
+          newCalibration.setTriggerButton(calibrateBtn);
+        });
+        
+        // Store gridState for calibration
+        window.gridState = {
+          zoom: 1,
+          referenceScale: 0
+        };
+        
+        // Initialize calibrated DPR with the reported one
+        window.calibratedDPR = window.devicePixelRatio || 1;
         
         // Listen for units change events from Schematic
         schematic.on('units:change', (data) => {

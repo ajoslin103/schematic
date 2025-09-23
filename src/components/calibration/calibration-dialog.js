@@ -22,6 +22,7 @@ class CalibrationDialog {
    * @param {string} options.referenceObject.unit - Unit of reference object dimensions
    * @param {number} options.targetHeight - Target height in pixels for reference object
    * @param {number} options.dpi - Base DPI value (default: 96)
+   * @param {function} options.onCalibrationComplete - Callback function when calibration is completed
    */
   constructor(options) {
     this.container = options.container;
@@ -30,9 +31,13 @@ class CalibrationDialog {
     this.referenceObject = options.referenceObject || this.getDefaultReferenceObject();
     this.targetHeight = options.targetHeight || 318; // Default target height in pixels
     this.dpi = options.dpi || 96; // Standard screen DPI
+    this.onCalibrationComplete = options.onCalibrationComplete || null;
     
     // Calculate reference scale based on system
     this.referenceScale = 0; // Start at 0%
+    
+    // Store calculated device pixel ratio
+    this.calculatedDPR = window.devicePixelRatio || 1;
     
     // Load the template and initialize
     this.initialized = false;
@@ -278,11 +283,23 @@ class CalibrationDialog {
   }
   
   /**
-   * Close the calibration dialog
+   * Close the calibration dialog and calculate device pixel ratio
    */
   closeDialog() {
     if (this.dialog) {
       this.dialog.close();
+      
+      // Calculate the device pixel ratio based on calibration
+      this.calculateDevicePixelRatio();
+      
+      // Call the completion callback if provided
+      if (typeof this.onCalibrationComplete === 'function') {
+        this.onCalibrationComplete({
+          calculatedDPR: this.calculatedDPR,
+          referenceScale: this.referenceScale,
+          system: this.system
+        });
+      }
     }
   }
   
@@ -313,6 +330,46 @@ class CalibrationDialog {
     }
     
     button.addEventListener('click', () => this.showDialog());
+  }
+  
+  /**
+   * Calculate the device pixel ratio based on the calibration
+   * @returns {number} The calculated device pixel ratio
+   */
+  calculateDevicePixelRatio() {
+    // Get the reported device pixel ratio
+    const reportedDPR = window.devicePixelRatio || 1;
+    
+    // Only calculate if we have a valid reference scale and base scale
+    if (!this.referenceScale || !this.gridState || !this.gridState.baseScale) {
+      return reportedDPR;
+    }
+    
+    // The ratio between what the user calibrated and what we expected
+    // is our adjustment to the device pixel ratio
+    const adjustmentFactor = this.referenceScale / this.gridState.baseScale;
+    
+    // Calculate the actual device pixel ratio based on calibration
+    // If user makes card bigger (referenceScale > baseScale), actual DPR is lower than reported
+    this.calculatedDPR = reportedDPR / adjustmentFactor;
+    
+    // Log the calculations
+    console.log(`Calibration results:`);
+    console.log(`- Reported device pixel ratio: ${reportedDPR}`);
+    console.log(`- Reference scale: ${this.referenceScale}`);
+    console.log(`- Base scale: ${this.gridState.baseScale}`);
+    console.log(`- Adjustment factor: ${adjustmentFactor}`);
+    console.log(`- Calculated device pixel ratio: ${this.calculatedDPR}`);
+    
+    return this.calculatedDPR;
+  }
+  
+  /**
+   * Get the calculated device pixel ratio
+   * @returns {number} The calculated device pixel ratio
+   */
+  getDevicePixelRatio() {
+    return this.calculatedDPR;
   }
 }
 
