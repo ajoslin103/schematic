@@ -6,16 +6,16 @@ export default [
     input: 'src/index.js',
     output: [
       { 
-        file: 'dist/schematic-map.cjs.js', 
+        file: 'dist/schematic.cjs.js', 
         format: 'cjs',
         exports: 'named'
       },
       { 
-        file: 'dist/schematic-map.esm.js', 
+        file: 'dist/schematic.esm.js', 
         format: 'esm'
       },
       { 
-        file: 'dist/schematic-map.umd.js', 
+        file: 'dist/schematic.umd.js', 
         format: 'umd',
         name: 'SchematicMap',
         globals: {
