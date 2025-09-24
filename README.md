@@ -1,16 +1,16 @@
-# Schematic Map
+# Schematic
 
 A [fabric.js](https://fabricjs.com/) library, for working with fabric objects above a coordinate plane.
 
-`schematic-map` is based on the excellent original work of [IndoorJS](https://github.com/mudin/indoorjs) by [Mudin](https://github.com/mudin).
+`schematic` is based on the excellent original work of [IndoorJS](https://github.com/mudin/indoorjs) by [Mudin](https://github.com/mudin).
 
 
 ## Architecture
-                             / -> Grid (draws lines/axes/labels)
-                            /
+                                             / -> Grid (draws lines/axes/labels)
+                                           /
 Your Application -> The Schematic -> The Map
-                                \
-                                 \ -> Fabric.js canvas
+                                          \
+                                           \ -> Fabric.js canvas
 
 ### The Schematic
 
@@ -55,9 +55,9 @@ The Fabric.js canvas does what it does — see their docs for details. The Fabri
 - TypeScript type definitions included
 
 ```bash
-npm install schematic-map fabric
+npm install schematic fabric
 # or
-yarn add schematic-map fabric
+yarn add schematic fabric
 ```
 
 ## Quick start
@@ -68,7 +68,7 @@ The package exports both the `Schematic` class (recommended) and the lower-level
 
 ```javascript
 // JavaScript
-import { Schematic } from 'schematic-map';
+import { Schematic } from 'schematic';
 
 const container = document.getElementById('canvas-container');
 const schematic = new Schematic(container, {
@@ -92,7 +92,7 @@ fabricCanvas.add(circle);
 ### TypeScript Example
 
 ```typescript
-import { Schematic } from 'schematic-map';
+import { Schematic } from 'schematic';
 import { Circle } from 'fabric';
 
 const container = document.getElementById('canvas-container');
@@ -122,7 +122,7 @@ schematic.fabric.add(circle);
 ### Using the lower-level Map
 
 ```javascript
-import { Map } from 'schematic-map';
+import { Map } from 'schematic';
 
 const container = document.getElementById('canvas-container');
 const map = new Map(container, { setShowGrid: true });

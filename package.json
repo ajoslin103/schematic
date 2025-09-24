@@ -1,11 +1,11 @@
 {
-  "name": "schematic-map",
+  "name": "schematic",
   "version": "0.3.0",
   "description": "The IndoorJs Grid as a FabricJS library, facilitates working above coordinate planes",
   "type": "module",
-  "main": "dist/schematic-map.cjs.js",
-  "module": "dist/schematic-map.esm.js",
-  "browser": "dist/schematic-map.umd.js",
+  "main": "dist/schematic.cjs.js",
+  "module": "dist/schematic.esm.js",
+  "browser": "dist/schematic.umd.js",
   "types": "dist/types/index.d.ts",
   "files": [
     "dist"
@@ -15,14 +15,13 @@
     "dev": "npm run build && (npm run watch & npm run serve)",
     "watch": "rollup -c -w",
     "serve": "browser-sync start --server --files 'dist/**/*.js,demo/**/*.html' --startPath demo/grid-demo.html",
-    "dev:old": "browser-sync start --server --files 'src/**/*.js,demo/**/*.html' --startPath demo/grid-demo.html",
     "prepublishOnly": "yarn build",
     "publish:npm": "npm publish --access public",
     "publish:jsr": "npx jsr publish"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ajoslin103/schematic-maps.git"
+    "url": "git+https://github.com/ajoslin103/schematic.git"
   },
   "keywords": [
     "fabric",
@@ -31,7 +30,7 @@
     "schematic",
     "interactive"
   ],
-  "author": "Allen Joslin <ajoslin103@gmail.com>",
+  "author": "Allen Joslin <allen.joslin@gmail.com>",
   "license": "MIT",
   "peerDependencies": {
     "fabric": "^6.7.1"

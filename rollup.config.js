@@ -17,7 +17,7 @@ export default [
       { 
         file: 'dist/schematic.umd.js', 
         format: 'umd',
-        name: 'SchematicMap',
+        name: 'Schematic',
         globals: {
           'fabric': 'fabric'
         },
