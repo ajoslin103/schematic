@@ -704,19 +704,26 @@ export class Schematic extends Base {
       const newZoom = direction > 0 ? currentZoom * zoomFactor : currentZoom / zoomFactor;
       
       // Apply zoom
-      // If Alt/Option is held, zoom around the mouse position to keep it stationary.
-      // Otherwise, preserve existing behavior (anchor at screen position of world origin).
+      // Zoom behavior is controlled by zoomOnCenter setting and Alt key:
+      // - When zoomOnCenter is FALSE (default): Normal = zoom on cursor, Alt = zoom on origin
+      // - When zoomOnCenter is TRUE: Normal = zoom on origin, Alt = zoom on cursor
       this.mapInstance.zoom = newZoom;
       const canvas = this.fabricCanvas;
       const vptBefore = canvas.viewportTransform;
       let point;
-      if (opt.e.altKey) {
+      
+      // Determine whether to zoom on cursor based on zoomOnCenter setting and Alt key
+      const shouldZoomOnCursor = this.zoomOnCenter ? opt.e.altKey : !opt.e.altKey;
+      
+      if (shouldZoomOnCursor) {
+        // Zoom around mouse cursor position
         const el = (canvas.getElement && canvas.getElement()) || canvas.upperCanvasEl || canvas.lowerCanvasEl;
         const rect = el.getBoundingClientRect();
         const px = opt.e.clientX - rect.left;
         const py = opt.e.clientY - rect.top;
         point = new fabric.Point(px, py);
       } else {
+        // Zoom around world origin screen position
         const originScreenX = vptBefore ? vptBefore[4] : canvas.width / 2;
         const originScreenY = vptBefore ? vptBefore[5] : canvas.height / 2;
         point = new fabric.Point(originScreenX, originScreenY);
