@@ -236,9 +236,9 @@
             schematic.setZoomOnCenter(checked);
           }
         };
-        toggleZoomOnCenter?.addEventListener('change', syncScrollbarsPref);
+        toggleZoomOnCenter?.addEventListener('change', syncZoomOnCenterPref);
         // Initialize preference on load
-        syncScrollbarsPref();
+        syncZoomOnCenterPref();
 
         // Persist-only: wire Show Grid to schematic (no behavior)
         const toggleGrid = document.getElementById('toggleGrid');
@@ -248,9 +248,9 @@
             schematic.setShowGrid(checked);
           }
         };
-        toggleGrid?.addEventListener('change', syncScrollbarsPref);
+        toggleGrid?.addEventListener('change', syncShowGridPref);
         // Initialize preference on load
-        syncScrollbarsPref();
+        syncShowGridPref();
 
         // Add sample content to demonstrate the library using Schematic's API
         const circle = new fabric.Circle({
