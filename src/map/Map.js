@@ -102,7 +102,7 @@ export class Map extends Base {
         setTimeout(() => this.fabricCanvas.renderAll(), 50);
       }, 100);
     });
-
+    
   }
 
   addGrid() {
@@ -134,12 +134,15 @@ export class Map extends Base {
 
   setZoom(zoom) {
     const { width, height } = this.fabricCanvas;
+    
+    // Apply zoom constraints
     this.zoom = clamp(zoom, this.minZoom, this.maxZoom);
     this.dx = 0;
     this.dy = 0;
     this.x = width / 2.0;
     this.y = height / 2.0;
     this.update();
+    
     // Use setTimeout for browser compatibility
     setTimeout(() => {
       this.update();
@@ -194,9 +197,6 @@ export class Map extends Base {
   update() {
     const canvas = this.fabricCanvas;
     
-    // Minimal debug info for the update cycle
-    console.log(`[Map] Update with zoom: ${this.zoom}`);
-    
     // Always clamp zoom to bounds, even if set directly elsewhere
     const z = clamp(this.zoom, this.minZoom, this.maxZoom);
     if (z !== this.zoom) {
@@ -212,22 +212,15 @@ export class Map extends Base {
     if (this.grid) {
       // Get current viewport transform to calculate world coordinates
       const vpt = canvas.viewportTransform;
-      console.log(`[Map] Grid update with units: ${this.grid.units || 'unknown'}`);
-      
       if (vpt) {
         // Calculate the viewport center in world coordinates
         const centerX = (canvas.width / 2 - vpt[4]) / vpt[0];
         const centerY = (canvas.height / 2 - vpt[5]) / vpt[3];
         const gridCenterY = -centerY;
         
-        // Calculate coordinates
-        
         // Calculate unit to pixel size directly from the FabricJS viewport transform
         // vpt[0] is the x-scale factor which tells us how many pixels 1 unit takes up
         const unitToPixelSize = vpt[0];
-        
-        // Log the actual pixel size for debugging
-        console.log(`[Map] FabricJS unitToPixelSize: ${unitToPixelSize} pixels per unit at zoom ${this.zoom}`);
         
         // Create test points to verify scaling
         const originPoint = new fabric.Point(0, 0);
@@ -238,7 +231,6 @@ export class Map extends Base {
           Math.pow(pixelUnit.x - pixelOrigin.x, 2) + 
           Math.pow(pixelUnit.y - pixelOrigin.y, 2)
         );
-        console.log(`[Map] Verified: 1 unit = ${measuredPixels.toFixed(2)} pixels at current zoom`);
         
         // Calculate grid units for scaling - this is critical for proper conversion
         // FabricJS uses points as its base unit, so we need to calculate pixels per unit
@@ -264,12 +256,12 @@ export class Map extends Base {
         const scaledPixelSize = measuredPixels / unitScaleFactor;
         
         // Detailed logging to verify unit scaling is working correctly
-        console.log(`[Map] ===== UNIT CONVERSION INFO =====`);
-        console.log(`[Map] Base metrics: 1 FabricJS unit = ${measuredPixels.toFixed(4)} pixels at zoom ${this.zoom}`);
-        console.log(`[Map] Unit system: ${currentUnits}, scale factor: ${unitScaleFactor}`);
-        console.log(`[Map] Final: 1 ${currentUnits} = ${scaledPixelSize.toFixed(4)} pixels`);
-        console.log(`[Map] Expected ratios: 1 inch = 72 points, 1 mm = 2.835 points`);
-        console.log(`[Map] ===== END UNIT CONVERSION INFO =====`);
+        // console.log(`[Map] ===== UNIT CONVERSION INFO =====`);
+        // console.log(`[Map] Base metrics: 1 FabricJS unit = ${measuredPixels.toFixed(4)} pixels at zoom ${this.zoom}`);
+        // console.log(`[Map] Unit system: ${currentUnits}, scale factor: ${unitScaleFactor}`);
+        // console.log(`[Map] Final: 1 ${currentUnits} = ${scaledPixelSize.toFixed(4)} pixels`);
+        // console.log(`[Map] Expected ratios: 1 inch = 72 points, 1 mm = 2.835 points`);
+        // console.log(`[Map] ===== END UNIT CONVERSION INFO =====`);
         
         // Update the grid with the calculated values
         this.grid.updateViewport({

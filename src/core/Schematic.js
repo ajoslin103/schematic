@@ -671,6 +671,34 @@ export class Schematic extends Base {
     
     // Update the zoom level in the Map instance
     if (this.mapInstance) {
+      // Check if we're trying to zoom in when minimum increment is displayed
+      const isZoomingIn = direction > 0;
+      const isMinimumIncrementVisible = this.mapInstance.grid && 
+        typeof this.mapInstance.grid.isMinimumIncrementVisible === 'function' && 
+        this.mapInstance.grid.isMinimumIncrementVisible();
+      
+      // Block zoom-in events when minimum increment is already displayed
+      if (isZoomingIn && isMinimumIncrementVisible) {
+        console.log('[Schematic] Blocking zoom-in as minimum increment is already displayed');
+        // Emit an event to notify UI components that minimum increment has been reached
+        this.emit('zoom:minimum:reached', { units: this.mapInstance.grid.getUnits() });
+        return; // Exit early without zooming in
+      }
+
+      // Check if we're trying to zoom out when maximum increment is displayed
+      const isZoomingOut = direction < 0;
+      const isMaximumIncrementVisible = this.mapInstance.grid && 
+        typeof this.mapInstance.grid.isMaximumIncrementVisible === 'function' && 
+        this.mapInstance.grid.isMaximumIncrementVisible();
+      
+      // Block zoom-out events when maximum increment is already displayed
+      if (isZoomingOut && isMaximumIncrementVisible) {
+        console.log('[Schematic] Blocking zoom-out as maximum increment is already displayed');
+        // Emit an event to notify UI components that maximum increment has been reached
+        this.emit('zoom:maximum:reached', { units: this.mapInstance.grid.getUnits() });
+        return; // Exit early without zooming out
+      }
+      
       // Calculate the new zoom level based on wheel direction
       const currentZoom = this.mapInstance.zoom;
       const newZoom = direction > 0 ? currentZoom * zoomFactor : currentZoom / zoomFactor;

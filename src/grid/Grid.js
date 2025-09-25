@@ -13,11 +13,15 @@ import {
   calculateTickPoints
 } from './grid-calcs.js';
 import {
+  MAX_NATURAL_INCREMENTS,
+  MIN_NATURAL_INCREMENTS,
   POINTS_PER_INCH,
-  POINTS_PER_CM,
+  POINTS_PER_MM,
   calculateMaxZoom,
   calculateGridSpacing,
   calculateLabelDensity,
+  isDisplayAtMinimum,
+  isDisplayAtMaximum,
   formatValueByUnits,
   convertDistance
 } from './grid-units.js';
@@ -51,10 +55,6 @@ class Grid extends Base {
   // Axis objects for x and y dimensions
   axisX = null;
   axisY = null;
-  
-  // Unit conversion constants
-  POINTS_PER_INCH = POINTS_PER_INCH; // Standard DTP points per inch
-  POINTS_PER_CM = POINTS_PER_CM; // Points per centimeter (72/2.54)
 
   // Grid configuration
   type = 'linear';
@@ -177,7 +177,7 @@ class Grid extends Base {
     // Store unitToPixelSize if provided by FabricJS
     if (center.unitToPixelSize !== undefined) {
       this.unitToPixelSize = center.unitToPixelSize;
-      console.log(`[Grid] Received unitToPixelSize: ${this.unitToPixelSize} (pixels per unit at current zoom)`); 
+      // console.log(`[Grid] Received unitToPixelSize: ${this.unitToPixelSize} (pixels per unit at current zoom)`); 
       
       // Critical test for unit conversion - this will verify our scaling fix
       if (this.units === 'imperial') {
@@ -301,9 +301,14 @@ class Grid extends Base {
    * @return {Grid} This instance for chaining
    */
   draw() {
+    // Reset the minimum increment tracking flag at the start of each render cycle
+    this.minimumIncrementDisplayed = false;
+    this.maximumIncrementDisplayed = false;
+    
     this.context.clearRect(0, 0, this.width, this.height);
     this.drawLines(this.state.x, this.context);
     this.drawLines(this.state.y, this.context);
+    
     return this;
   }
 
@@ -433,6 +438,22 @@ class Grid extends Base {
   getUnits() {
     return this.units;
   }
+  
+  /**
+   * Check if minimum increments are visible at the current zoom level
+   * @return {boolean} True if minimum increments are visible
+   */
+  isMinimumIncrementVisible() {
+    return this.minimumIncrementDisplayed === true;
+  }
+  
+  /**
+   * Check if maximum increments are visible at the current zoom level
+   * @return {boolean} True if maximum increments are visible
+   */
+  isMaximumIncrementVisible() {
+    return this.maximumIncrementDisplayed === true;
+  }
 
   drawLabels(state, ctx) {
     if (state.labels) {
@@ -448,9 +469,9 @@ class Grid extends Base {
       const isOpp = state.coordinate.orientation === 'y' && !state.opposite.disabled;
       
       // Calculate label density based on zoom level
-      console.log(`[Grid] Calculating label density for units: ${this.units}, zoom: ${this.zoom}`);
+      // console.log(`[Grid] Calculating label density for units: ${this.units}, zoom: ${this.zoom}`);
       const labelDensity = calculateLabelDensity(this.units, this.zoom);
-      console.log(`[Grid] Label density calculated: ${labelDensity} (will show 1 label per ${labelDensity} grid lines)`);
+      // console.log(`[Grid] Label density calculated: ${labelDensity} (will show 1 label per ${labelDensity} grid lines)`);
       
       for (let i = 0; i < state.labels.length; i += 1) {
         let label = state.labels[i];
@@ -483,18 +504,25 @@ class Grid extends Base {
           displayValue = label / POINTS_PER_INCH;
         } else if (this.units === 'metric') {
           // Convert from points to mm (2.835 points = 1 mm)
-          displayValue = label / (POINTS_PER_INCH / 25.4);
+          displayValue = label / POINTS_PER_MM;
         }
         
         // Format the label based on current units
         const formattedLabel = formatValueByUnits(displayValue, this.units);
         
-        // Only show the first label for debugging, if needed
-        if (i === 0) {
-          console.log(`[Grid] Label example: ${label} points → ${displayValue.toFixed(2)} ${this.units} → ${formattedLabel}`);
-        }
-        
         ctx.fillText(formattedLabel, textLeft, textTop);
+
+        // Check if this label represents the minimum natural increment for the current unit system
+        if (isDisplayAtMinimum(displayValue, this.units)) {
+          // Track that we've displayed the minimum increment
+          this.minimumIncrementDisplayed = true;
+        }
+
+        // Check if this label represents the maximum natural increment for the current unit system
+        if (isDisplayAtMaximum(displayValue, this.units)) {
+          // Track that we've displayed the maximum increment
+          this.maximumIncrementDisplayed = true;
+        }
       }
     }
   }
