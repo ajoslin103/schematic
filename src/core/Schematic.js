@@ -134,8 +134,7 @@ export class Schematic extends Base {
   }
 
   /**
-   * Persist a UI preference for showing native scrollbars.
-   * This does not implement any behavior yet; it only logs and emits an event.
+   * Set whether to show native scrollbars on the canvas container.
    * @param {boolean} enabled - Whether to show scrollbars
    * @return {Schematic} - Returns this Schematic instance for chaining
    */
@@ -143,6 +142,22 @@ export class Schematic extends Base {
     const next = !!enabled;
     if (this.showScrollbars === next) return this;
     this.showScrollbars = next;
+    
+    // Apply scrollbar visibility to the container
+    if (this.container) {
+      this.container.style.overflow = next ? 'auto' : 'hidden';
+      
+      // Give the browser time to update layout, then refresh the map/grid
+      setTimeout(() => {
+        if (this.mapInstance && typeof this.mapInstance.update === 'function') {
+          this.mapInstance.update();
+        }
+        if (this.fabricCanvas && typeof this.fabricCanvas.requestRenderAll === 'function') {
+          this.fabricCanvas.requestRenderAll();
+        }
+      }, 0);
+    }
+    
     try {
       console.log('[schematic] showScrollbars changed:', this.showScrollbars);
     } catch {}

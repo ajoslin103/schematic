@@ -2,15 +2,12 @@
 
 A [fabric.js](https://fabricjs.com/) library, for working with fabric objects above a coordinate plane.
 
-`schematic` is based on the excellent original work of [IndoorJS](https://github.com/mudin/indoorjs) by [Mudin](https://github.com/mudin).
-
-
 ## Architecture
-                             / -> Grid (draws lines/axes/labels)
-                            /
+                                        / -> Grid (draws lines/axes/labels)
+                                       /
 Your Application -> The Schematic -> The Map
-                                \
-                                 \ -> Fabric.js canvas
+                                           \
+                                            \ -> Fabric.js canvas
 
 ### The Schematic
 
@@ -166,3 +163,6 @@ fabricCanvas.add(circle);
 - Right-click (or Ctrl+Left on macOS) + drag to pan. Mouse wheel to zoom (Alt/Option anchors zoom to cursor).
 - Grid renders in Fabric’s `before:render` and never mutates Fabric objects.
 - Coordinates shown by the grid invert Y for display; Fabric world coordinates remain standard.
+
+Schematic was based on the excellent original work of [IndoorJS](https://github.com/mudin/indoorjs) by [Mudin](https://github.com/mudin).
+

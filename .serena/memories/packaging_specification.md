@@ -1,11 +1,11 @@
-# IndoorJS Packaging Specification
+# Schematic Packaging Specification
 
 ## Minimal Distribution Structure
 ```
 ├── dist/
-│   ├── indoor.cjs.js    # CommonJS for Node.js
-│   ├── indoor.esm.js    # ES Modules for bundlers
-│   └── indoor.umd.js    # Browser-ready UMD
+│   ├── schematic.cjs.js    # CommonJS for Node.js
+│   ├── schematic.esm.js    # ES Modules for bundlers
+│   └── schematic.umd.js    # Browser-ready UMD
 ├── src/
 │   └── ... (your lean codebase)
 ├── package.json
@@ -32,12 +32,6 @@ npm install -D rollup @rollup/plugin-node-resolve
 npm run build
 ```
 
-### 3. File Mapping
-| Context          | Entry Point               | Usage                           |
-|------------------|---------------------------|---------------------------------|
-| Node.js (CJS)    | `dist/indoor.cjs.js`      | `const { Map } = require('indoorjs-core')` |
-| Bundlers (ESM)    | `dist/indoor.esm.js`      | `import { Map } from 'indoorjs-core'` |
-| Browser (UMD)    | `dist/indoor.umd.js`      | Global `IndoorMap` object       |
 
 ---
 
@@ -69,7 +63,7 @@ export default defineConfig({
 });
 
 // Your component
-import { Map } from 'indoorjs-core';
+import { Map } from 'schematic-map';
 import * as fabric from 'fabric-pure-browser';
 
 const map = new Map(document.getElementById('map'), { ... });

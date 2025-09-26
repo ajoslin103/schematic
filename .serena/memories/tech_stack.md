@@ -15,5 +15,4 @@
 
 ## Build Process
 1. Rollup for module bundling
-2. UglifyJS for minification
 3. Source maps generation
