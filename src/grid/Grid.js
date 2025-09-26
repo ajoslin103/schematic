@@ -60,8 +60,6 @@ class Grid extends Base {
   type = 'linear';
   name = '';
   units = 'points'; // Default units: points, imperial, metric
-  minZoom = -Infinity;
-  maxZoom = Infinity;
   min = -Infinity;
   max = Infinity;
   offset = 0;
@@ -221,8 +219,6 @@ class Grid extends Base {
       // Geometry/viewport defaults expected by Axis/calculations
       zoom: 1,
       offset: 0,
-      minZoom: -Infinity,
-      maxZoom: Infinity,
       min: -Infinity,
       max: Infinity,
       axis: true,
@@ -408,17 +404,6 @@ class Grid extends Base {
     console.log(`[Grid] Converting units from ${prevUnits} to ${units}, distance before: ${this.distance}`);
     this.distance = convertDistance(this.distance, prevUnits, units);
     console.log(`[Grid] After conversion: distance = ${this.distance}`);
-    
-    // Update max zoom based on minimum natural increments
-    const previousMaxZoom = this.maxZoom;
-    this.maxZoom = calculateMaxZoom(units, this.pixelRatio, this.maxZoom);
-    console.log(`[Grid] Max zoom updated: ${previousMaxZoom} → ${this.maxZoom} for units: ${units}`);
-    
-    // If current zoom exceeds new max zoom, adjust it
-    if (this.zoom > this.maxZoom) {
-      console.log(`[Grid] Current zoom (${this.zoom}) exceeds max zoom, clamping to ${this.maxZoom}`);
-      this.zoom = this.maxZoom;
-    }
     
     // Update configuration and render the grid
     this.updateConfiguration();

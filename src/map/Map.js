@@ -135,8 +135,8 @@ export class Map extends Base {
   setZoom(zoom) {
     const { width, height } = this.fabricCanvas;
     
-    // Apply zoom constraints
-    this.zoom = clamp(zoom, this.minZoom, this.maxZoom);
+    // Set zoom directly without constraints
+    this.zoom = zoom;
     this.dx = 0;
     this.dy = 0;
     this.x = width / 2.0;
@@ -196,12 +196,6 @@ export class Map extends Base {
 
   update() {
     const canvas = this.fabricCanvas;
-    
-    // Always clamp zoom to bounds, even if set directly elsewhere
-    const z = clamp(this.zoom, this.minZoom, this.maxZoom);
-    if (z !== this.zoom) {
-      this.zoom = z;
-    }
 
     // First apply the zoom to the center of the canvas
     const centerPoint = new fabric.Point(canvas.width / 2, canvas.height / 2);

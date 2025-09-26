@@ -64,15 +64,6 @@
       </div>
       <div style="margin-bottom:15px;">
         <label style="margin-right:10px;">
-          Min Zoom: <input id="minZoomInput" type="number" step="0.01" value="0.05" style="width:70px;">
-        </label>
-        <label style="margin-right:10px;">
-          Max Zoom: <input id="maxZoomInput" type="number" step="0.01" value="20" style="width:70px;">
-        </label>
-        <!-- <button id="resetView">Reset View</button> -->
-      </div>
-      <div style="margin-bottom:15px;">
-        <label style="margin-right:10px;">
           Pin Origin: 
           <select id="pinSelect" style="width:100px;">
             <option selected value="NONE">None</option>
@@ -193,28 +184,6 @@
         }
         // Initial sizing
         resize();
-
-        const minZoom = document.getElementById('minZoomInput');
-        const maxZoom = document.getElementById('maxZoomInput');
-        const updateZoom = () => {
-          // No zoom clamping - simply use the input values directly
-          const zoomValue = Number(minZoom.value) || 0.01;
-          const maxValue = Number(maxZoom.value) || 20;
-          
-          // Update zoom without limits
-          schematic.setZoomLimits(-Infinity, Infinity);
-          
-          // Set current zoom without clamping
-          const currentZoom = mapInstance.zoom || 1.0;
-          schematic.setZoom(currentZoom);
-        };
-        
-        // Add event listeners for zoom controls
-        minZoom?.addEventListener('change', updateZoom);
-        maxZoom?.addEventListener('change', updateZoom);
-        
-        // Initial zoom setup
-        updateZoom();
 
         // Persist-only: wire Show Scrollbars to schematic (no behavior)
         const toggleScrollbars = document.getElementById('toggleScrollbars');

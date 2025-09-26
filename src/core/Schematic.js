@@ -819,25 +819,6 @@ export class Schematic extends Base {
   }
   
   /**
-   * Set minimum and maximum zoom levels
-   * @param {number} min - Minimum zoom level
-   * @param {number} max - Maximum zoom level
-   * @return {Schematic} - Returns this Schematic instance for chaining
-   */
-  setZoomLimits(min, max) {
-    if (this.mapInstance) {
-      // Store the values directly without validation
-      this.mapInstance.minZoom = min;
-      this.mapInstance.maxZoom = max;
-      
-      // No constraining of current zoom
-      
-      this.mapInstance.update();
-    }
-    return this;
-  }
-  
-  /**
    * Reset the view to initial state
    * @return {Schematic} - Returns this Schematic instance for chaining
    */
@@ -845,7 +826,6 @@ export class Schematic extends Base {
     if (this.mapInstance && this.mapInstance.reset) {
       this.mapInstance.reset();
       this.mapInstance.update();
-      this.emit('view:reset');
     }
     return this;
   }

@@ -11,8 +11,6 @@ export const Modes = {
 export const MAP = {
   center: new Point(),
   zoom: 1,
-  minZoom: 0,
-  maxZoom: 20,
   gridEnabled: true,
   zoomEnabled: true,
   selectEnabled: true,
