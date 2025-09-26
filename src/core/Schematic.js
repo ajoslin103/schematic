@@ -143,20 +143,20 @@ export class Schematic extends Base {
     if (this.showScrollbars === next) return this;
     this.showScrollbars = next;
     
-    // // Apply scrollbar visibility to the container
-    // if (this.container) {
-    //   this.container.style.overflow = next ? 'auto' : 'hidden';
+    // Apply scrollbar visibility to the container
+    if (this.container) {
+      this.container.style.overflow = next ? 'scroll' : 'hidden';
       
-    //   // Give the browser time to update layout, then refresh the map/grid
-    //   setTimeout(() => {
-    //     if (this.mapInstance && typeof this.mapInstance.update === 'function') {
-    //       this.mapInstance.update();
-    //     }
-    //     if (this.fabricCanvas && typeof this.fabricCanvas.requestRenderAll === 'function') {
-    //       this.fabricCanvas.requestRenderAll();
-    //     }
-    //   }, 0);
-    // }
+      // Give the browser time to update layout, then refresh the map/grid
+      setTimeout(() => {
+        if (this.mapInstance && typeof this.mapInstance.update === 'function') {
+          this.mapInstance.update();
+        }
+        if (this.fabricCanvas && typeof this.fabricCanvas.requestRenderAll === 'function') {
+          this.fabricCanvas.requestRenderAll();
+        }
+      }, 0);
+    }
     
     try {
       console.log('[schematic] showScrollbars changed:', this.showScrollbars);
