@@ -15,6 +15,8 @@ export class Schematic extends Base {
       gridEnabled: true,
       // Control whether zoom is applied around viewport center (true) or mouse position (false)
       zoomOnCenter: false,
+      // Control whether mouse wheel zooming is enabled
+      mouseWheelZoom: true,
       // Persisted UI hint: whether to show native scrollbars. No behavior yet.
       showScrollbars: false,
       // Default grid units (points, imperial, metric)
@@ -122,6 +124,30 @@ export class Schematic extends Base {
       console.log('[schematic] zoomOnCenter changed:', this.zoomOnCenter);
     } catch {}
     this.emit && this.emit('zoom:settings:change', { zoomOnCenter: this.zoomOnCenter });
+    return this;
+  }
+  
+  /**
+   * Get the mouseWheelZoom property
+   * @return {boolean} - Current mouseWheelZoom state
+   */
+  getMouseWheelZoom() {
+    return !!this.mouseWheelZoom;
+  }
+
+  /**
+   * Set the mouseWheelZoom property
+   * @param {boolean} enabled - Whether to enable mouse wheel zooming
+   * @return {Schematic} - Returns this Schematic instance for chaining
+   */
+  setMouseWheelZoom(enabled) {
+    const next = !!enabled;
+    if (this.mouseWheelZoom === next) return this;
+    this.mouseWheelZoom = next;
+    try {
+      console.log('[schematic] mouseWheelZoom changed:', this.mouseWheelZoom);
+    } catch {}
+    this.emit && this.emit('zoom:settings:change', { mouseWheelZoom: this.mouseWheelZoom });
     return this;
   }
 
