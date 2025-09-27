@@ -1,6 +1,6 @@
 {
   "name": "@ajoslin103/schematic",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "A FabricJS library, facilitating working above coordinate planes",
   "type": "module",
   "main": "dist/schematic.cjs.js",
