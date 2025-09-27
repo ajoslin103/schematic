@@ -7,6 +7,14 @@
   "module": "dist/schematic.esm.js",
   "browser": "dist/schematic.umd.js",
   "types": "dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/schematic.esm.js",
+      "require": "./dist/schematic.cjs.js",
+      "browser": "./dist/schematic.umd.js",
+      "default": "./dist/schematic.cjs.js"
+    }
+  },
   "files": [
     "dist"
   ],
