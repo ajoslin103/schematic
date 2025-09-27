@@ -3,6 +3,9 @@ export { default as Base } from './core/Base.js';
 export { MAP, Modes, initializeFabric } from './core/Constants.js';
 export { Schematic, schematic } from './core/Schematic.js';
 
+// Type definitions
+export { BaseOptions, SchematicOptions, FabricCanvas } from './core/types.js';
+
 // Geometry
 export { Point } from './geometry/Point.js';
 

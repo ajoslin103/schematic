@@ -19,7 +19,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "rollup -c",
+    "build": "rollup -c && tsc --emitDeclarationOnly",
+    "build:types": "tsc --emitDeclarationOnly",
     "dev": "npm run build && (npm run watch & npm run serve)",
     "watch": "rollup -c -w",
     "serve": "browser-sync start --server --files 'dist/**/*.js,demo/**/*.html' --startPath demo/grid-demo.html",
@@ -48,6 +49,7 @@
     "@rollup/plugin-commonjs": "^28.0.6",
     "@rollup/plugin-node-resolve": "^16.0.1",
     "browser-sync": "^3.0.4",
-    "rollup": "^4.22.4"
+    "rollup": "^4.22.4",
+    "typescript": "^5.9.2"
   }
 }
