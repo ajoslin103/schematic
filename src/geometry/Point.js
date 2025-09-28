@@ -1,4 +1,4 @@
-import fabric from 'fabric';
+import * as fabric from 'fabric';
 
 export class Point extends fabric.Point {
   constructor(...params) {

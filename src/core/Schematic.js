@@ -1,6 +1,6 @@
 import Base from './Base.js';
 import { Map } from '../map/Map.js';
-import fabric from 'fabric';
+import * as fabric from 'fabric';
 
 /**
  * Schematic class for handling event subscriptions and emissions
