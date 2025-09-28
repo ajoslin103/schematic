@@ -121,7 +121,7 @@ export class Map extends Base {
     
     // Hook into Fabric's render events to draw the grid after Fabric has rendered
     this.fabricCanvas.on('before:render', () => {
-      if (this.grid) {
+      if (this.grid && this.grid.visible !== false) {
         this.grid.render();
       }
     });
@@ -273,8 +273,10 @@ export class Map extends Base {
         });
       }
       
-      // Render the grid with the updated position
-      this.grid.render();
+      // Render the grid with the updated position (only if visible)
+      if (this.grid.visible !== false) {
+        this.grid.render();
+      }
       
       // Force Fabric canvas to re-render to ensure objects are displayed after unit changes
       this.fabricCanvas.requestRenderAll();

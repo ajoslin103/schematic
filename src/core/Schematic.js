@@ -424,14 +424,22 @@ export class Schematic extends Base {
    */
   toggleGridVisibility(visible) {
     // Add grid when turning on
-    if (visible && this.mapInstance && !this.mapInstance.grid) {
-      this.mapInstance.addGrid();
-      // Ensure grid starts with correct viewport
+    if (visible && this.mapInstance) {
+      if (!this.mapInstance.grid) {
+        this.mapInstance.addGrid();
+      } else {
+        // Set grid back to visible
+        this.mapInstance.grid.visible = true;
+      }
+      // Always update to ensure grid has correct viewport position
+      // This is critical when grid was hidden during panning
       this.mapInstance.update();
     }
-    // Remove grid when turning off
+    // Hide grid when turning off (but keep the grid object to preserve state)
     if (!visible && this.mapInstance && this.mapInstance.grid) {
-      this.mapInstance.grid = null;
+      // Instead of destroying the grid, just stop rendering it
+      // This preserves its position state during panning
+      this.mapInstance.grid.visible = false;
       // Trigger a render so the cleared background shows
       if (this.fabricCanvas && typeof this.fabricCanvas.requestRenderAll === 'function') {
         this.fabricCanvas.requestRenderAll();
