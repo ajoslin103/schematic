@@ -66,10 +66,6 @@ export class Schematic extends Base {
     // Debug flag for event logging
     this.debugEvents = options?.debugEvents ?? true;
     if (this.debugEvents) console.log('[schematic] init', { interactions: options?.interactions !== false });
-    // Expose instance for manual inspection
-    if (typeof window !== 'undefined') {
-      window.schematic = this;
-    }
     
     // Register event listeners if interactions are enabled
     if (options?.interactions !== false) {
