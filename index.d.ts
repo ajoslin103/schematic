@@ -166,6 +166,9 @@ export class Schematic extends Base {
   // Units methods
   getUnits(): 'points' | 'imperial' | 'metric';
   setUnits(units: 'points' | 'imperial' | 'metric'): void;
+  
+  // Cleanup method
+  destroy(): void;
 }
 
 export function schematic(container: HTMLElement | string, options?: SchematicOptions): Schematic;
