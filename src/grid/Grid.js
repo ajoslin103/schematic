@@ -3,6 +3,7 @@ import { clamp, almost } from '../lib/mumath/index.js';
 import gridStyle from './gridStyle.js';
 import Axis from './Axis.js';
 import { Point } from '../geometry/Point.js';
+import { Debug } from '../core/Debug.js';
 import { 
   calcCoordinate, 
   getCenterCoords, 
@@ -94,9 +95,11 @@ class Grid extends Base {
     super(opts);
     this.context = context;
     
-    // Immediate debug to verify grid-units.js integration
-    console.log('[Grid-DEBUG] Grid class instantiated with units support');
-    console.log('[Grid-DEBUG] Units module functions available:', {
+    // Initialize debug system
+    this.debug = opts?.debug || new Debug(false);
+    
+    this.debug.log('grid', '[Grid] Grid class instantiated with units support');
+    this.debug.log('grid', '[Grid] Units module functions available:', {
       convertDistance: typeof convertDistance === 'function',
       formatValueByUnits: typeof formatValueByUnits === 'function',
       calculateGridSpacing: typeof calculateGridSpacing === 'function'
@@ -105,8 +108,7 @@ class Grid extends Base {
     this.setDefaults();
     this.updateConfiguration(opts);
     
-    // Force a units log
-    console.log('[Grid-DEBUG] Initial units:', this.units);
+    this.debug.log('grid', '[Grid] Initial units:', this.units);
   }
 
   render() {
@@ -141,7 +143,7 @@ class Grid extends Base {
     
     // Update grid spacing based on units and zoom level
     if (this.units && this.zoom) {
-      console.log(`[Grid] Calculating optimal spacing for units: ${this.units}, zoom: ${this.zoom}`);
+      this.debug.log('grid', `[Grid] Calculating optimal spacing for units: ${this.units}, zoom: ${this.zoom}`);
       
       // Pass unitToPixelSize from FabricJS if available
       const optimalSpacing = calculateGridSpacing(
@@ -151,10 +153,10 @@ class Grid extends Base {
         this.unitToPixelSize
       );
       
-      console.log(`[Grid] Optimal spacing calculated: ${optimalSpacing}`);
+      this.debug.log('grid', `[Grid] Optimal spacing calculated: ${optimalSpacing}`);
       if (optimalSpacing > 0) {
         this.distance = optimalSpacing;
-        console.log(`[Grid] Grid distance updated to: ${this.distance}`);
+        this.debug.log('grid', `[Grid] Grid distance updated to: ${this.distance}`);
       }
     }
 
@@ -175,16 +177,15 @@ class Grid extends Base {
     // Store unitToPixelSize if provided by FabricJS
     if (center.unitToPixelSize !== undefined) {
       this.unitToPixelSize = center.unitToPixelSize;
-      // console.log(`[Grid] Received unitToPixelSize: ${this.unitToPixelSize} (pixels per unit at current zoom)`); 
       
       // Critical test for unit conversion - this will verify our scaling fix
       if (this.units === 'imperial') {
         // Test conversion of 100 points
         const testPoints = 100;
         const testInches = testPoints / 72; // Standard conversion: 72 points = 1 inch
-        console.log(`[Grid-TESTCONV] ${testPoints} points = ${testInches.toFixed(2)} inches`);
-        console.log(`[Grid-TESTCONV] For reference: 100 pixels should be about 1.39 inches, not 8'4"`);
-        console.log(`[Grid-TESTCONV] Current unitToPixelSize: ${this.unitToPixelSize} pixels per ${this.units} unit`);
+        this.debug.log('units', `[Grid-TESTCONV] ${testPoints} points = ${testInches.toFixed(2)} inches`);
+        this.debug.log('units', `[Grid-TESTCONV] For reference: 100 pixels should be about 1.39 inches, not 8'4"`);
+        this.debug.log('units', `[Grid-TESTCONV] Current unitToPixelSize: ${this.unitToPixelSize} pixels per ${this.units} unit`);
       }
     }
     
@@ -401,9 +402,9 @@ class Grid extends Base {
     this.units = units;
     
     // Convert grid spacing to the new unit system
-    console.log(`[Grid] Converting units from ${prevUnits} to ${units}, distance before: ${this.distance}`);
+    this.debug.log('units', `[Grid] Converting units from ${prevUnits} to ${units}, distance before: ${this.distance}`);
     this.distance = convertDistance(this.distance, prevUnits, units);
-    console.log(`[Grid] After conversion: distance = ${this.distance}`);
+    this.debug.log('units', `[Grid] After conversion: distance = ${this.distance}`);
     
     // Update configuration and render the grid
     this.updateConfiguration();

@@ -353,14 +353,6 @@ class CalibrationDialog {
     // If user makes card bigger (referenceScale > baseScale), actual DPR is lower than reported
     this.calculatedDPR = reportedDPR / adjustmentFactor;
     
-    // Log the calculations
-    console.log(`Calibration results:`);
-    console.log(`- Reported device pixel ratio: ${reportedDPR}`);
-    console.log(`- Reference scale: ${this.referenceScale}`);
-    console.log(`- Base scale: ${this.gridState.baseScale}`);
-    console.log(`- Adjustment factor: ${adjustmentFactor}`);
-    console.log(`- Calculated device pixel ratio: ${this.calculatedDPR}`);
-    
     return this.calculatedDPR;
   }
   

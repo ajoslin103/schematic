@@ -394,9 +394,6 @@ function getFractionString(value) {
  * @return {number} The converted distance
  */
 export function convertDistance(distance, fromUnits, toUnits) {
-  // Critical debugging for unit conversion issue
-  console.log(`[Grid-Units] Converting ${distance} from ${fromUnits} to ${toUnits}`);
-  
   if (fromUnits === toUnits) {
     return distance;
   }
@@ -427,11 +424,9 @@ export function convertDistance(distance, fromUnits, toUnits) {
   } else if (toUnits === 'imperial') {
     // Convert points to inches
     result = pointValue / POINTS_PER_INCH;
-    console.log(`[Grid-Units] Point to inch: ${pointValue} points = ${result} inches (÷ ${POINTS_PER_INCH})`);
   } else if (toUnits === 'metric') {
     // Convert points to mm
     result = pointValue / POINTS_PER_MM;
-    console.log(`[Grid-Units] Point to mm: ${pointValue} points = ${result} mm (÷ ${POINTS_PER_MM})`);
   } else {
     // Fallback
     result = distance;

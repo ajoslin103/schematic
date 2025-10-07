@@ -33,6 +33,33 @@ export class Base {
   _options: Record<string, any>;
 }
 
+// Debug types
+export interface DebugOptions {
+  schematic?: boolean;
+  events?: boolean;
+  grid?: boolean;
+  map?: boolean;
+  units?: boolean;
+  calibration?: boolean;
+}
+
+export class Debug {
+  constructor(options?: boolean | DebugOptions);
+  flags: {
+    schematic: boolean;
+    events: boolean;
+    grid: boolean;
+    map: boolean;
+    units: boolean;
+    calibration: boolean;
+  };
+  log(category: string, ...args: any[]): void;
+  warn(category: string, ...args: any[]): void;
+  enable(category: string | 'all'): void;
+  disable(category: string | 'all'): void;
+  isEnabled(category: string): boolean;
+}
+
 // Constants
 export enum MAP {
   STEP = 10,
@@ -129,6 +156,7 @@ export interface SchematicOptions {
   zoomDebounceDelay?: number;
   zoomOnCenter?: boolean;
   units?: 'points' | 'imperial' | 'metric';
+  debug?: boolean | DebugOptions;
 }
 
 export class Schematic extends Base {

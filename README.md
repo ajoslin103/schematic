@@ -152,6 +152,51 @@ fabricCanvas.add(circle);
 - **`Map`** (lower-level): manages Fabric canvas and grid sync.
   - `setZoom(zoom)`, `reset()`, `onResize(w,h)`, `update()`
 
+## Debug Logging
+
+The library includes a centralized debug system that allows you to control console output by category. By default, all debug logging is disabled for production use.
+
+### Enable all debug output
+
+```javascript
+const schematic = new Schematic(container, {
+  debug: true  // Enable all debug categories
+});
+```
+
+### Enable specific categories
+
+```javascript
+const schematic = new Schematic(container, {
+  debug: {
+    schematic: true,  // Schematic-level operations
+    events: true,     // Mouse/interaction events
+    grid: false,      // Grid rendering
+    map: false,       // Map updates
+    units: false,     // Unit conversions
+    calibration: false // Calibration tools
+  }
+});
+```
+
+### Runtime control
+
+```javascript
+// Enable a category at runtime
+schematic.debug.enable('events');
+
+// Disable a category
+schematic.debug.disable('grid');
+
+// Enable all
+schematic.debug.enable('all');
+
+// Check if enabled
+if (schematic.debug.isEnabled('units')) {
+  // ...
+}
+```
+
 ## Development
 
 - Demo: `npm run dev` (serves `demo/grid-demo.html` with live-reload)

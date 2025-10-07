@@ -1,6 +1,7 @@
 import Base from './Base.js';
 import { Map } from '../map/Map.js';
 import * as fabric from 'fabric';
+import { Debug } from './Debug.js';
 
 /**
  * Schematic class for handling event subscriptions and emissions
@@ -63,9 +64,9 @@ export class Schematic extends Base {
     // Initialize zoom debounce properties
     this.zoomDebounceTimeout = null;
     this.zoomDebounceDelay = options?.zoomDebounceDelay || 200; // ms
-    // Debug flag for event logging
-    this.debugEvents = options?.debugEvents ?? true;
-    if (this.debugEvents) console.log('[schematic] init', { interactions: options?.interactions !== false });
+    // Initialize debug system
+    this.debug = new Debug(options?.debug ?? false);
+    this.debug.log('schematic', '[schematic] init', { interactions: options?.interactions !== false });
     
     // Register event listeners if interactions are enabled
     if (options?.interactions !== false) {
@@ -92,9 +93,7 @@ export class Schematic extends Base {
     this.gridEnabled = next;
     // Call the grid visibility toggle implementation
     this.toggleGridVisibility(next);
-    try {
-      console.log('[schematic] gridEnabled changed:', this.gridEnabled);
-    } catch {}
+    this.debug.log('schematic', '[schematic] gridEnabled changed:', this.gridEnabled);
     this.emit && this.emit('grid:change', { enabled: this.gridEnabled });
     return this;
   }
@@ -116,9 +115,7 @@ export class Schematic extends Base {
     const next = !!enabled;
     if (this.zoomOnCenter === next) return this;
     this.zoomOnCenter = next;
-    try {
-      console.log('[schematic] zoomOnCenter changed:', this.zoomOnCenter);
-    } catch {}
+    this.debug.log('schematic', '[schematic] zoomOnCenter changed:', this.zoomOnCenter);
     this.emit && this.emit('zoom:settings:change', { zoomOnCenter: this.zoomOnCenter });
     return this;
   }
@@ -140,9 +137,7 @@ export class Schematic extends Base {
     const next = !!enabled;
     if (this.mouseWheelZoom === next) return this;
     this.mouseWheelZoom = next;
-    try {
-      console.log('[schematic] mouseWheelZoom changed:', this.mouseWheelZoom);
-    } catch {}
+    this.debug.log('schematic', '[schematic] mouseWheelZoom changed:', this.mouseWheelZoom);
     this.emit && this.emit('zoom:settings:change', { mouseWheelZoom: this.mouseWheelZoom });
     return this;
   }
@@ -180,9 +175,7 @@ export class Schematic extends Base {
       }, 0);
     }
     
-    try {
-      console.log('[schematic] showScrollbars changed:', this.showScrollbars);
-    } catch {}
+    this.debug.log('schematic', '[schematic] showScrollbars changed:', this.showScrollbars);
     this.emit && this.emit('scrollbars:change', { enabled: this.showScrollbars });
     return this;
   }
@@ -214,10 +207,7 @@ export class Schematic extends Base {
       this.mapInstance.grid.setUnits(units);
     }
     
-    try {
-      console.log('[schematic] units changed:', this.units);
-    } catch {}
-    
+    this.debug.log('schematic', '[schematic] units changed:', this.units);
     this.emit && this.emit('units:change', { units: this.units });
     return this;
   }
@@ -473,7 +463,7 @@ export class Schematic extends Base {
     this.lastPosY = 0;
     
     // Register mouse events for right-click panning
-    if (this.debugEvents) console.log('[events] registering fabric mouse handlers');
+    this.debug.log('events', '[events] registering fabric mouse handlers');
 
     const isSecondary = (e) => e && (
       e.button === 2 || // standard right click
@@ -498,7 +488,7 @@ export class Schematic extends Base {
 
     // One-time render confirmation
     const onceAfterRender = () => {
-      if (this.debugEvents) console.log('[fabric] after:render (once)');
+      this.debug.log('events', '[fabric] after:render (once)');
       this.fabricCanvas.off('after:render', onceAfterRender);
     };
     this.fabricCanvas.on('after:render', onceAfterRender);
@@ -506,11 +496,11 @@ export class Schematic extends Base {
     // DOM-level fallback listeners on Fabric canvas element
     this._canvasDomElement = this.fabricCanvas && (this.fabricCanvas.upperCanvasEl || this.fabricCanvas.lowerCanvasEl || this.fabricCanvas.getElement && this.fabricCanvas.getElement());
     if (this._canvasDomElement) {
-      if (this.debugEvents) console.log('[dom] attaching mouse listeners to canvas element');
+      this.debug.log('events', '[dom] attaching mouse listeners to canvas element');
       this._canvasDomElement.addEventListener('contextmenu', this._canvasContextMenuHandler);
       this._canvasDomElement.addEventListener('mousedown', this._canvasMouseDownHandler, true);
-    } else if (this.debugEvents) {
-      console.warn('[dom] fabric canvas element not found for DOM listeners');
+    } else {
+      this.debug.warn('events', '[dom] fabric canvas element not found for DOM listeners');
     }
     
     return this;
@@ -542,7 +532,7 @@ export class Schematic extends Base {
       
       // Block zoom-in events when minimum increment is already displayed
       if (isZoomingIn && isMinimumIncrementVisible) {
-        console.log('[Schematic] Blocking zoom-in as minimum increment is already displayed');
+        this.debug.log('schematic', '[Schematic] Blocking zoom-in as minimum increment is already displayed');
         // Emit an event to notify UI components that minimum increment has been reached
         this.emit('zoom:minimum:reached', { units: this.mapInstance.grid.getUnits() });
         return; // Exit early without zooming in
@@ -556,7 +546,7 @@ export class Schematic extends Base {
       
       // Block zoom-out events when maximum increment is already displayed
       if (isZoomingOut && isMaximumIncrementVisible) {
-        console.log('[Schematic] Blocking zoom-out as maximum increment is already displayed');
+        this.debug.log('schematic', '[Schematic] Blocking zoom-out as maximum increment is already displayed');
         // Emit an event to notify UI components that maximum increment has been reached
         this.emit('zoom:maximum:reached', { units: this.mapInstance.grid.getUnits() });
         return; // Exit early without zooming out
@@ -714,7 +704,7 @@ export class Schematic extends Base {
       (e.ctrlKey && e.button === 0)
     );
 
-    if (this.debugEvents) console.log('[fabric] mouse:down', {
+    this.debug.log('events', '[fabric] mouse:down', {
       button: opt?.e?.button,
       buttons: opt?.e?.buttons,
       which: opt?.e?.which,
@@ -728,10 +718,10 @@ export class Schematic extends Base {
     
     if (isSecondary(opt.e)) {
       if (this.originPin && this.originPin !== 'NONE') {
-        if (this.debugEvents) console.log('[drag] pan blocked due to pinned origin', { originPin: this.originPin });
+        this.debug.log('events', '[drag] pan blocked due to pinned origin', { originPin: this.originPin });
         return;
       }
-      if (this.debugEvents) console.log('[drag] mouse:down', { button: opt.e.button, x: opt.e.clientX, y: opt.e.clientY });
+      this.debug.log('events', '[drag] mouse:down', { button: opt.e.button, x: opt.e.clientX, y: opt.e.clientY });
       this.isPanning = true;
       this.lastPosX = opt.e.clientX;
       this.lastPosY = opt.e.clientY;
@@ -741,7 +731,7 @@ export class Schematic extends Base {
       this._prevSelection = this.fabricCanvas.selection;
       this.fabricCanvas.selection = false;
       this._suppressNextContextMenu = !!opt.e.ctrlKey && opt.e.button === 0;
-      if (this.debugEvents) console.log('[drag] start panning', { lastPosX: this.lastPosX, lastPosY: this.lastPosY });
+      this.debug.log('events', '[drag] start panning', { lastPosX: this.lastPosX, lastPosY: this.lastPosY });
     }
   }
 
@@ -773,7 +763,7 @@ export class Schematic extends Base {
    * @private
    */
   _handleMouseUp(opt) {
-    if (this.debugEvents) console.log('[fabric] mouse:up', {
+    this.debug.log('events', '[fabric] mouse:up', {
       button: opt?.e?.button,
       buttons: opt?.e?.buttons,
       which: opt?.e?.which,
@@ -784,7 +774,7 @@ export class Schematic extends Base {
     });
     
     if (this.isPanning) {
-      if (this.debugEvents) console.log('[drag] mouse:up - end panning');
+      this.debug.log('events', '[drag] mouse:up - end panning');
       this.isPanning = false;
       this.fabricCanvas.defaultCursor = 'default';
       this._suppressNextContextMenu = false;
@@ -812,7 +802,7 @@ export class Schematic extends Base {
    */
   _handleMouseOut(opt) {
     const relatedTarget = opt?.e?.relatedTarget || null;
-    if (this.debugEvents) console.log('[fabric] mouse:out', {
+    this.debug.log('events', '[fabric] mouse:out', {
       relatedTarget,
       button: opt?.e?.button,
       buttons: opt?.e?.buttons,
@@ -825,7 +815,7 @@ export class Schematic extends Base {
     const leavingCanvas = !!relatedTarget && (relatedTarget === document.body || (domEl && !domEl.contains(relatedTarget)));
     
     if (this.isPanning && leavingCanvas) {
-      if (this.debugEvents) console.log('[drag] mouse:out - cancel panning');
+      this.debug.log('events', '[drag] mouse:out - cancel panning');
       this.isPanning = false;
       this.fabricCanvas.defaultCursor = 'default';
       this._suppressNextContextMenu = false;
@@ -852,7 +842,7 @@ export class Schematic extends Base {
    * @private
    */
   _handleContainerContextMenu(e) {
-    if (this.debugEvents) console.log('[drag] contextmenu prevented', {
+    this.debug.log('events', '[drag] contextmenu prevented', {
       button: e.button,
       buttons: e.buttons,
       which: e.which,
@@ -876,7 +866,7 @@ export class Schematic extends Base {
    * @private
    */
   _handleCanvasContextMenu(e) {
-    if (this.debugEvents) console.log('[dom] contextmenu prevented on canvas', {
+    this.debug.log('events', '[dom] contextmenu prevented on canvas', {
       button: e.button,
       buttons: e.buttons,
       which: e.which,
@@ -903,7 +893,7 @@ export class Schematic extends Base {
     const isCtrlPrimary = e.ctrlKey && e.button === 0;
     const isSecondaryBtn = e.button === 2;
     
-    if (this.debugEvents) console.log('[dom] mousedown', {
+    this.debug.log('events', '[dom] mousedown', {
       button: e.button,
       buttons: e.buttons,
       which: e.which,
@@ -916,7 +906,7 @@ export class Schematic extends Base {
     });
     
     if (isCtrlPrimary || isSecondaryBtn) {
-      if (this.debugEvents) console.log('[dom] mousedown (no preventDefault) — will suppress upcoming contextmenu', { ctrlPrimary: isCtrlPrimary, secondaryBtn: isSecondaryBtn });
+      this.debug.log('events', '[dom] mousedown (no preventDefault) — will suppress upcoming contextmenu', { ctrlPrimary: isCtrlPrimary, secondaryBtn: isSecondaryBtn });
       this._suppressNextContextMenu = true;
     }
   }
@@ -927,7 +917,7 @@ export class Schematic extends Base {
    * @return {void}
    */
   destroy() {
-    if (this.debugEvents) console.log('[schematic] destroying instance');
+    this.debug.log('schematic', '[schematic] destroying instance');
     
     // Clear zoom debounce timeout
     if (this.zoomDebounceTimeout) {
@@ -998,7 +988,7 @@ export class Schematic extends Base {
     this._canvasContextMenuHandler = null;
     this._canvasMouseDownHandler = null;
     
-    if (this.debugEvents) console.log('[schematic] destroyed successfully');
+    this.debug.log('schematic', '[schematic] destroyed successfully');
   }
 }
 
