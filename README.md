@@ -2,6 +2,16 @@
 
 A [fabric.js](https://fabricjs.com/) library, for working with fabric objects above a coordinate plane.
 
+<div style="position: relative; padding-top: 102.69320843091334%;">
+  <iframe
+    src="https://customer-07ipt1f17u9wyil4.cloudflarestream.com/d7447956e969ce80d2f0113a59a04324/iframe?muted=true&preload=true&loop=true&autoplay=true&poster=https%3A%2F%2Fcustomer-07ipt1f17u9wyil4.cloudflarestream.com%2Fd7447956e969ce80d2f0113a59a04324%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D%26height%3D600"
+    loading="lazy"
+    style="border: none; position: absolute; top: 0; left: 0; height: 100%; width: 100%;"
+    allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+    allowfullscreen="true"
+  ></iframe>
+</div>
+
 ## Architecture
                                         / -> Grid (draws lines/axes/labels)
                                        /
