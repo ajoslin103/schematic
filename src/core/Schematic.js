@@ -1,6 +1,7 @@
 import Base from './Base.js';
 import { Map } from '../map/Map.js';
-import fabric from 'fabric';
+import * as fabric from 'fabric';
+import { Debug } from './Debug.js';
 
 /**
  * Schematic class for handling event subscriptions and emissions
@@ -15,6 +16,8 @@ export class Schematic extends Base {
       gridEnabled: true,
       // Control whether zoom is applied around viewport center (true) or mouse position (false)
       zoomOnCenter: false,
+      // Control whether mouse wheel zooming is enabled
+      mouseWheelZoom: true,
       // Persisted UI hint: whether to show native scrollbars. No behavior yet.
       showScrollbars: false,
       // Default grid units (points, imperial, metric)
@@ -61,13 +64,9 @@ export class Schematic extends Base {
     // Initialize zoom debounce properties
     this.zoomDebounceTimeout = null;
     this.zoomDebounceDelay = options?.zoomDebounceDelay || 200; // ms
-    // Debug flag for event logging
-    this.debugEvents = options?.debugEvents ?? true;
-    if (this.debugEvents) console.log('[schematic] init', { interactions: options?.interactions !== false });
-    // Expose instance for manual inspection
-    if (typeof window !== 'undefined') {
-      window.schematic = this;
-    }
+    // Initialize debug system
+    this.debug = new Debug(options?.debug ?? false);
+    this.debug.log('schematic', '[schematic] init', { interactions: options?.interactions !== false });
     
     // Register event listeners if interactions are enabled
     if (options?.interactions !== false) {
@@ -94,9 +93,7 @@ export class Schematic extends Base {
     this.gridEnabled = next;
     // Call the grid visibility toggle implementation
     this.toggleGridVisibility(next);
-    try {
-      console.log('[schematic] gridEnabled changed:', this.gridEnabled);
-    } catch {}
+    this.debug.log('schematic', '[schematic] gridEnabled changed:', this.gridEnabled);
     this.emit && this.emit('grid:change', { enabled: this.gridEnabled });
     return this;
   }
@@ -118,10 +115,30 @@ export class Schematic extends Base {
     const next = !!enabled;
     if (this.zoomOnCenter === next) return this;
     this.zoomOnCenter = next;
-    try {
-      console.log('[schematic] zoomOnCenter changed:', this.zoomOnCenter);
-    } catch {}
+    this.debug.log('schematic', '[schematic] zoomOnCenter changed:', this.zoomOnCenter);
     this.emit && this.emit('zoom:settings:change', { zoomOnCenter: this.zoomOnCenter });
+    return this;
+  }
+  
+  /**
+   * Get the mouseWheelZoom property
+   * @return {boolean} - Current mouseWheelZoom state
+   */
+  getMouseWheelZoom() {
+    return !!this.mouseWheelZoom;
+  }
+
+  /**
+   * Set the mouseWheelZoom property
+   * @param {boolean} enabled - Whether to enable mouse wheel zooming
+   * @return {Schematic} - Returns this Schematic instance for chaining
+   */
+  setMouseWheelZoom(enabled) {
+    const next = !!enabled;
+    if (this.mouseWheelZoom === next) return this;
+    this.mouseWheelZoom = next;
+    this.debug.log('schematic', '[schematic] mouseWheelZoom changed:', this.mouseWheelZoom);
+    this.emit && this.emit('zoom:settings:change', { mouseWheelZoom: this.mouseWheelZoom });
     return this;
   }
 
@@ -134,8 +151,7 @@ export class Schematic extends Base {
   }
 
   /**
-   * Persist a UI preference for showing native scrollbars.
-   * This does not implement any behavior yet; it only logs and emits an event.
+   * Set whether to show native scrollbars on the canvas container.
    * @param {boolean} enabled - Whether to show scrollbars
    * @return {Schematic} - Returns this Schematic instance for chaining
    */
@@ -143,9 +159,23 @@ export class Schematic extends Base {
     const next = !!enabled;
     if (this.showScrollbars === next) return this;
     this.showScrollbars = next;
-    try {
-      console.log('[schematic] showScrollbars changed:', this.showScrollbars);
-    } catch {}
+    
+    // Apply scrollbar visibility to the container
+    if (this.container) {
+      this.container.style.overflow = next ? 'scroll' : 'hidden';
+      
+      // Give the browser time to update layout, then refresh the map/grid
+      setTimeout(() => {
+        if (this.mapInstance && typeof this.mapInstance.update === 'function') {
+          this.mapInstance.update();
+        }
+        if (this.fabricCanvas && typeof this.fabricCanvas.requestRenderAll === 'function') {
+          this.fabricCanvas.requestRenderAll();
+        }
+      }, 0);
+    }
+    
+    this.debug.log('schematic', '[schematic] showScrollbars changed:', this.showScrollbars);
     this.emit && this.emit('scrollbars:change', { enabled: this.showScrollbars });
     return this;
   }
@@ -177,10 +207,7 @@ export class Schematic extends Base {
       this.mapInstance.grid.setUnits(units);
     }
     
-    try {
-      console.log('[schematic] units changed:', this.units);
-    } catch {}
-    
+    this.debug.log('schematic', '[schematic] units changed:', this.units);
     this.emit && this.emit('units:change', { units: this.units });
     return this;
   }
@@ -383,14 +410,22 @@ export class Schematic extends Base {
    */
   toggleGridVisibility(visible) {
     // Add grid when turning on
-    if (visible && this.mapInstance && !this.mapInstance.grid) {
-      this.mapInstance.addGrid();
-      // Ensure grid starts with correct viewport
+    if (visible && this.mapInstance) {
+      if (!this.mapInstance.grid) {
+        this.mapInstance.addGrid();
+      } else {
+        // Set grid back to visible
+        this.mapInstance.grid.visible = true;
+      }
+      // Always update to ensure grid has correct viewport position
+      // This is critical when grid was hidden during panning
       this.mapInstance.update();
     }
-    // Remove grid when turning off
+    // Hide grid when turning off (but keep the grid object to preserve state)
     if (!visible && this.mapInstance && this.mapInstance.grid) {
-      this.mapInstance.grid = null;
+      // Instead of destroying the grid, just stop rendering it
+      // This preserves its position state during panning
+      this.mapInstance.grid.visible = false;
       // Trigger a render so the cleared background shows
       if (this.fabricCanvas && typeof this.fabricCanvas.requestRenderAll === 'function') {
         this.fabricCanvas.requestRenderAll();
@@ -409,8 +444,18 @@ export class Schematic extends Base {
     // Only register if we have a map instance
     if (!this.fabricCanvas || !this.mapInstance) return this;
     
+    // Store bound handlers for cleanup
+    this._boundHandleMouseWheel = this.handleMouseWheel.bind(this);
+    this._boundHandleMouseDown = this._handleMouseDown.bind(this);
+    this._boundHandleMouseMove = this._handleMouseMove.bind(this);
+    this._boundHandleMouseUp = this._handleMouseUp.bind(this);
+    this._boundHandleMouseOut = this._handleMouseOut.bind(this);
+    this._containerContextMenuHandler = this._handleContainerContextMenu.bind(this);
+    this._canvasContextMenuHandler = this._handleCanvasContextMenu.bind(this);
+    this._canvasMouseDownHandler = this._handleCanvasMouseDown.bind(this);
+    
     // Register mouse wheel event for zooming
-    this.fabricCanvas.on('mouse:wheel', this.handleMouseWheel.bind(this));
+    this.fabricCanvas.on('mouse:wheel', this._boundHandleMouseWheel);
     
     // Variables to track right-click panning
     this.isPanning = false;
@@ -418,7 +463,7 @@ export class Schematic extends Base {
     this.lastPosY = 0;
     
     // Register mouse events for right-click panning
-    if (this.debugEvents) console.log('[events] registering fabric mouse handlers');
+    this.debug.log('events', '[events] registering fabric mouse handlers');
 
     const isSecondary = (e) => e && (
       e.button === 2 || // standard right click
@@ -427,227 +472,35 @@ export class Schematic extends Base {
       (e.ctrlKey && e.button === 0) // ctrl+left on macOS
     );
 
-    this.fabricCanvas.on('mouse:down', (opt) => {
-      if (this.debugEvents) console.log('[fabric] mouse:down', {
-        button: opt?.e?.button,
-        buttons: opt?.e?.buttons,
-        which: opt?.e?.which,
-        ctrlKey: !!opt?.e?.ctrlKey,
-        metaKey: !!opt?.e?.metaKey,
-        altKey: !!opt?.e?.altKey,
-        shiftKey: !!opt?.e?.shiftKey,
-        x: opt?.e?.clientX,
-        y: opt?.e?.clientY
-      });
-      // Check if it's a right-click / secondary click
-      if (isSecondary(opt.e)) {
-        // Block panning while an origin pin is active
-        if (this.originPin && this.originPin !== 'NONE') {
-          if (this.debugEvents) console.log('[drag] pan blocked due to pinned origin', { originPin: this.originPin });
-          return;
-        }
-        if (this.debugEvents) console.log('[drag] mouse:down', { button: opt.e.button, x: opt.e.clientX, y: opt.e.clientY });
-        this.isPanning = true;
-        this.lastPosX = opt.e.clientX;
-        this.lastPosY = opt.e.clientY;
-        this.fabricCanvas.defaultCursor = 'grabbing';
-        // Disable selection/target finding during pan
-        this._prevSkipTargetFind = this.fabricCanvas.skipTargetFind;
-        this.fabricCanvas.skipTargetFind = true;
-        this._prevSelection = this.fabricCanvas.selection;
-        this.fabricCanvas.selection = false;
-        // If pan initiated by ctrl+left (macOS secondary), suppress the next contextmenu
-        this._suppressNextContextMenu = !!opt.e.ctrlKey && opt.e.button === 0;
-        if (this.debugEvents) console.log('[drag] start panning', { lastPosX: this.lastPosX, lastPosY: this.lastPosY });
-      }
-    });
+    this.fabricCanvas.on('mouse:down', this._boundHandleMouseDown);
     
-    this.fabricCanvas.on('mouse:move', (opt) => {
-      // if (this.debugEvents) console.log('[fabric] mouse:move', { x: opt.e.clientX, y: opt.e.clientY });
-      if (this.isPanning) {
-        const deltaX = opt.e.clientX - this.lastPosX;
-        const deltaY = opt.e.clientY - this.lastPosY;
-        // if (this.debugEvents) console.log('[drag] mouse:move', { deltaX, deltaY, from: { x: this.lastPosX, y: this.lastPosY }, to: { x: opt.e.clientX, y: opt.e.clientY } });
-        
-        // Update last position
-        this.lastPosX = opt.e.clientX;
-        this.lastPosY = opt.e.clientY;
-        
-        // Pan the fabric canvas
-        this.fabricCanvas.relativePan(new fabric.Point(deltaX, deltaY));
-        if (typeof this.fabricCanvas.requestRenderAll === 'function') this.fabricCanvas.requestRenderAll();
-        
-        // Update the map to refresh the grid position after panning
-        if (this.mapInstance) {
-          this.mapInstance.update();
-        }
-        
-        // Emit a pan event
-        this.emit('pan:move', { deltaX, deltaY });
-      }
-    });
+    this.fabricCanvas.on('mouse:move', this._boundHandleMouseMove);
     
-    this.fabricCanvas.on('mouse:up', (opt) => {
-      if (this.debugEvents) console.log('[fabric] mouse:up', {
-        button: opt?.e?.button,
-        buttons: opt?.e?.buttons,
-        which: opt?.e?.which,
-        ctrlKey: !!opt?.e?.ctrlKey,
-        metaKey: !!opt?.e?.metaKey,
-        altKey: !!opt?.e?.altKey,
-        shiftKey: !!opt?.e?.shiftKey
-      });
-      if (this.isPanning) {
-        if (this.debugEvents) console.log('[drag] mouse:up - end panning');
-        this.isPanning = false;
-        this.fabricCanvas.defaultCursor = 'default';
-        // Clear any pending contextmenu suppression
-        this._suppressNextContextMenu = false;
-        // Restore selection/target finding
-        if (this._prevSkipTargetFind !== undefined) {
-          this.fabricCanvas.skipTargetFind = this._prevSkipTargetFind;
-          this._prevSkipTargetFind = undefined;
-        }
-        if (this._prevSelection !== undefined) {
-          this.fabricCanvas.selection = this._prevSelection;
-          this._prevSelection = undefined;
-        }
-        
-        // Final grid update when panning completes
-        if (this.mapInstance) {
-          this.mapInstance.update();
-        }
-        
-        this.emit('pan:completed');
-      }
-    });
+    this.fabricCanvas.on('mouse:up', this._boundHandleMouseUp);
     
     // Handle cases where the mouse leaves the canvas during panning
-    this.fabricCanvas.on('mouse:out', (opt) => {
-      const relatedTarget = opt?.e?.relatedTarget || null;
-      if (this.debugEvents) console.log('[fabric] mouse:out', {
-        relatedTarget,
-        button: opt?.e?.button,
-        buttons: opt?.e?.buttons,
-        which: opt?.e?.which,
-        ctrlKey: !!opt?.e?.ctrlKey,
-        metaKey: !!opt?.e?.metaKey
-      });
-      // Only cancel when actually leaving the canvas element (e.g., into <body> or outside)
-      const domEl = this.fabricCanvas && (this.fabricCanvas.upperCanvasEl || this.fabricCanvas.lowerCanvasEl || (this.fabricCanvas.getElement && this.fabricCanvas.getElement()));
-      const leavingCanvas = !!relatedTarget && (relatedTarget === document.body || (domEl && !domEl.contains(relatedTarget)));
-      if (this.isPanning && leavingCanvas) {
-        if (this.debugEvents) console.log('[drag] mouse:out - cancel panning');
-        this.isPanning = false;
-        this.fabricCanvas.defaultCursor = 'default';
-        // Clear any pending contextmenu suppression
-        this._suppressNextContextMenu = false;
-        // Restore selection/target finding
-        if (this._prevSkipTargetFind !== undefined) {
-          this.fabricCanvas.skipTargetFind = this._prevSkipTargetFind;
-          this._prevSkipTargetFind = undefined;
-        }
-        if (this._prevSelection !== undefined) {
-          this.fabricCanvas.selection = this._prevSelection;
-          this._prevSelection = undefined;
-        }
-        
-        // Final grid update when mouse leaves during panning
-        if (this.mapInstance) {
-          this.mapInstance.update();
-        }
-        
-        this.emit('pan:completed');
-      }
-    });
+    this.fabricCanvas.on('mouse:out', this._boundHandleMouseOut);
     
     // Prevent context menu on right-click for panning
     if (this.container) {
-      this.container.addEventListener('contextmenu', (e) => {
-        if (this.debugEvents) console.log('[drag] contextmenu prevented', {
-          button: e.button,
-          buttons: e.buttons,
-          which: e.which,
-          ctrlKey: !!e.ctrlKey,
-          metaKey: !!e.metaKey,
-          altKey: !!e.altKey,
-          shiftKey: !!e.shiftKey,
-          pointerType: e.pointerType,
-          detail: e.detail
-        });
-        e.preventDefault();
-        e.stopPropagation();
-        // If we intentionally started pan via ctrl+click, do not cancel here; just suppress the menu
-        if (this._suppressNextContextMenu) {
-          return false;
-        }
-        return false;
-      }, false);
+      this.container.addEventListener('contextmenu', this._containerContextMenuHandler, false);
     }
 
     // One-time render confirmation
     const onceAfterRender = () => {
-      if (this.debugEvents) console.log('[fabric] after:render (once)');
+      this.debug.log('events', '[fabric] after:render (once)');
       this.fabricCanvas.off('after:render', onceAfterRender);
     };
     this.fabricCanvas.on('after:render', onceAfterRender);
 
     // DOM-level fallback listeners on Fabric canvas element
-    const domEl = this.fabricCanvas && (this.fabricCanvas.upperCanvasEl || this.fabricCanvas.lowerCanvasEl || this.fabricCanvas.getElement && this.fabricCanvas.getElement());
-    if (domEl) {
-      if (this.debugEvents) console.log('[dom] attaching mouse listeners to canvas element');
-      const isDomSecondary = (e) => (
-        e.button === 2 ||
-        e.buttons === 2 ||
-        e.which === 3 ||
-        (e.ctrlKey && e.button === 0)
-      );
-
-      domEl.addEventListener('contextmenu', (e) => {
-        if (this.debugEvents) console.log('[dom] contextmenu prevented on canvas', {
-          button: e.button,
-          buttons: e.buttons,
-          which: e.which,
-          ctrlKey: !!e.ctrlKey,
-          metaKey: !!e.metaKey,
-          altKey: !!e.altKey,
-          shiftKey: !!e.shiftKey,
-          pointerType: e.pointerType,
-          detail: e.detail
-        });
-        e.preventDefault();
-        e.stopPropagation();
-        // If we intentionally started pan via ctrl+click, do not cancel here; just suppress the menu
-        if (this._suppressNextContextMenu) {
-          return false;
-        }
-        return false;
-      });
-
-      // Minimal prevention to keep ctrl+click and two-finger/right-click drags delivering move events
-      domEl.addEventListener('mousedown', (e) => {
-        const isCtrlPrimary = e.ctrlKey && e.button === 0;
-        const isSecondaryBtn = e.button === 2; // two-finger/right-click
-        if (this.debugEvents) console.log('[dom] mousedown', {
-          button: e.button,
-          buttons: e.buttons,
-          which: e.which,
-          ctrlKey: !!e.ctrlKey,
-          metaKey: !!e.metaKey,
-          altKey: !!e.altKey,
-          shiftKey: !!e.shiftKey,
-          isCtrlPrimary,
-          isSecondaryBtn
-        });
-        if (isCtrlPrimary || isSecondaryBtn) {
-          if (this.debugEvents) console.log('[dom] mousedown (no preventDefault) — will suppress upcoming contextmenu', { ctrlPrimary: isCtrlPrimary, secondaryBtn: isSecondaryBtn });
-          // Suppress upcoming contextmenu so it doesn't cancel our pan, but let Fabric receive mousedown
-          this._suppressNextContextMenu = true;
-        }
-      }, true); // capture to run before default handlers
-      
-    } else if (this.debugEvents) {
-      console.warn('[dom] fabric canvas element not found for DOM listeners');
+    this._canvasDomElement = this.fabricCanvas && (this.fabricCanvas.upperCanvasEl || this.fabricCanvas.lowerCanvasEl || this.fabricCanvas.getElement && this.fabricCanvas.getElement());
+    if (this._canvasDomElement) {
+      this.debug.log('events', '[dom] attaching mouse listeners to canvas element');
+      this._canvasDomElement.addEventListener('contextmenu', this._canvasContextMenuHandler);
+      this._canvasDomElement.addEventListener('mousedown', this._canvasMouseDownHandler, true);
+    } else {
+      this.debug.warn('events', '[dom] fabric canvas element not found for DOM listeners');
     }
     
     return this;
@@ -671,24 +524,59 @@ export class Schematic extends Base {
     
     // Update the zoom level in the Map instance
     if (this.mapInstance) {
+      // Check if we're trying to zoom in when minimum increment is displayed
+      const isZoomingIn = direction > 0;
+      const isMinimumIncrementVisible = this.mapInstance.grid && 
+        typeof this.mapInstance.grid.isMinimumIncrementVisible === 'function' && 
+        this.mapInstance.grid.isMinimumIncrementVisible();
+      
+      // Block zoom-in events when minimum increment is already displayed
+      if (isZoomingIn && isMinimumIncrementVisible) {
+        this.debug.log('schematic', '[Schematic] Blocking zoom-in as minimum increment is already displayed');
+        // Emit an event to notify UI components that minimum increment has been reached
+        this.emit('zoom:minimum:reached', { units: this.mapInstance.grid.getUnits() });
+        return; // Exit early without zooming in
+      }
+
+      // Check if we're trying to zoom out when maximum increment is displayed
+      const isZoomingOut = direction < 0;
+      const isMaximumIncrementVisible = this.mapInstance.grid && 
+        typeof this.mapInstance.grid.isMaximumIncrementVisible === 'function' && 
+        this.mapInstance.grid.isMaximumIncrementVisible();
+      
+      // Block zoom-out events when maximum increment is already displayed
+      if (isZoomingOut && isMaximumIncrementVisible) {
+        this.debug.log('schematic', '[Schematic] Blocking zoom-out as maximum increment is already displayed');
+        // Emit an event to notify UI components that maximum increment has been reached
+        this.emit('zoom:maximum:reached', { units: this.mapInstance.grid.getUnits() });
+        return; // Exit early without zooming out
+      }
+      
       // Calculate the new zoom level based on wheel direction
       const currentZoom = this.mapInstance.zoom;
       const newZoom = direction > 0 ? currentZoom * zoomFactor : currentZoom / zoomFactor;
       
       // Apply zoom
-      // If Alt/Option is held, zoom around the mouse position to keep it stationary.
-      // Otherwise, preserve existing behavior (anchor at screen position of world origin).
+      // Zoom behavior is controlled by zoomOnCenter setting and Alt key:
+      // - When zoomOnCenter is FALSE (default): Normal = zoom on cursor, Alt = zoom on origin
+      // - When zoomOnCenter is TRUE: Normal = zoom on origin, Alt = zoom on cursor
       this.mapInstance.zoom = newZoom;
       const canvas = this.fabricCanvas;
       const vptBefore = canvas.viewportTransform;
       let point;
-      if (opt.e.altKey) {
+      
+      // Determine whether to zoom on cursor based on zoomOnCenter setting and Alt key
+      const shouldZoomOnCursor = this.zoomOnCenter ? opt.e.altKey : !opt.e.altKey;
+      
+      if (shouldZoomOnCursor) {
+        // Zoom around mouse cursor position
         const el = (canvas.getElement && canvas.getElement()) || canvas.upperCanvasEl || canvas.lowerCanvasEl;
         const rect = el.getBoundingClientRect();
         const px = opt.e.clientX - rect.left;
         const py = opt.e.clientY - rect.top;
         point = new fabric.Point(px, py);
       } else {
+        // Zoom around world origin screen position
         const originScreenX = vptBefore ? vptBefore[4] : canvas.width / 2;
         const originScreenY = vptBefore ? vptBefore[5] : canvas.height / 2;
         point = new fabric.Point(originScreenX, originScreenY);
@@ -769,25 +657,6 @@ export class Schematic extends Base {
   }
   
   /**
-   * Set minimum and maximum zoom levels
-   * @param {number} min - Minimum zoom level
-   * @param {number} max - Maximum zoom level
-   * @return {Schematic} - Returns this Schematic instance for chaining
-   */
-  setZoomLimits(min, max) {
-    if (this.mapInstance) {
-      // Store the values directly without validation
-      this.mapInstance.minZoom = min;
-      this.mapInstance.maxZoom = max;
-      
-      // No constraining of current zoom
-      
-      this.mapInstance.update();
-    }
-    return this;
-  }
-  
-  /**
    * Reset the view to initial state
    * @return {Schematic} - Returns this Schematic instance for chaining
    */
@@ -795,7 +664,6 @@ export class Schematic extends Base {
     if (this.mapInstance && this.mapInstance.reset) {
       this.mapInstance.reset();
       this.mapInstance.update();
-      this.emit('view:reset');
     }
     return this;
   }
@@ -822,6 +690,305 @@ export class Schematic extends Base {
       return this.mapInstance.removeObject(object);
     }
     return null;
+  }
+
+  /**
+   * Internal handler for mouse down events
+   * @private
+   */
+  _handleMouseDown(opt) {
+    const isSecondary = (e) => e && (
+      e.button === 2 ||
+      e.buttons === 2 ||
+      e.which === 3 ||
+      (e.ctrlKey && e.button === 0)
+    );
+
+    this.debug.log('events', '[fabric] mouse:down', {
+      button: opt?.e?.button,
+      buttons: opt?.e?.buttons,
+      which: opt?.e?.which,
+      ctrlKey: !!opt?.e?.ctrlKey,
+      metaKey: !!opt?.e?.metaKey,
+      altKey: !!opt?.e?.altKey,
+      shiftKey: !!opt?.e?.shiftKey,
+      x: opt?.e?.clientX,
+      y: opt?.e?.clientY
+    });
+    
+    if (isSecondary(opt.e)) {
+      if (this.originPin && this.originPin !== 'NONE') {
+        this.debug.log('events', '[drag] pan blocked due to pinned origin', { originPin: this.originPin });
+        return;
+      }
+      this.debug.log('events', '[drag] mouse:down', { button: opt.e.button, x: opt.e.clientX, y: opt.e.clientY });
+      this.isPanning = true;
+      this.lastPosX = opt.e.clientX;
+      this.lastPosY = opt.e.clientY;
+      this.fabricCanvas.defaultCursor = 'grabbing';
+      this._prevSkipTargetFind = this.fabricCanvas.skipTargetFind;
+      this.fabricCanvas.skipTargetFind = true;
+      this._prevSelection = this.fabricCanvas.selection;
+      this.fabricCanvas.selection = false;
+      this._suppressNextContextMenu = !!opt.e.ctrlKey && opt.e.button === 0;
+      this.debug.log('events', '[drag] start panning', { lastPosX: this.lastPosX, lastPosY: this.lastPosY });
+    }
+  }
+
+  /**
+   * Internal handler for mouse move events
+   * @private
+   */
+  _handleMouseMove(opt) {
+    if (this.isPanning) {
+      const deltaX = opt.e.clientX - this.lastPosX;
+      const deltaY = opt.e.clientY - this.lastPosY;
+      
+      this.lastPosX = opt.e.clientX;
+      this.lastPosY = opt.e.clientY;
+      
+      this.fabricCanvas.relativePan(new fabric.Point(deltaX, deltaY));
+      if (typeof this.fabricCanvas.requestRenderAll === 'function') this.fabricCanvas.requestRenderAll();
+      
+      if (this.mapInstance) {
+        this.mapInstance.update();
+      }
+      
+      this.emit('pan:move', { deltaX, deltaY });
+    }
+  }
+
+  /**
+   * Internal handler for mouse up events
+   * @private
+   */
+  _handleMouseUp(opt) {
+    this.debug.log('events', '[fabric] mouse:up', {
+      button: opt?.e?.button,
+      buttons: opt?.e?.buttons,
+      which: opt?.e?.which,
+      ctrlKey: !!opt?.e?.ctrlKey,
+      metaKey: !!opt?.e?.metaKey,
+      altKey: !!opt?.e?.altKey,
+      shiftKey: !!opt?.e?.shiftKey
+    });
+    
+    if (this.isPanning) {
+      this.debug.log('events', '[drag] mouse:up - end panning');
+      this.isPanning = false;
+      this.fabricCanvas.defaultCursor = 'default';
+      this._suppressNextContextMenu = false;
+      
+      if (this._prevSkipTargetFind !== undefined) {
+        this.fabricCanvas.skipTargetFind = this._prevSkipTargetFind;
+        this._prevSkipTargetFind = undefined;
+      }
+      if (this._prevSelection !== undefined) {
+        this.fabricCanvas.selection = this._prevSelection;
+        this._prevSelection = undefined;
+      }
+      
+      if (this.mapInstance) {
+        this.mapInstance.update();
+      }
+      
+      this.emit('pan:completed');
+    }
+  }
+
+  /**
+   * Internal handler for mouse out events
+   * @private
+   */
+  _handleMouseOut(opt) {
+    const relatedTarget = opt?.e?.relatedTarget || null;
+    this.debug.log('events', '[fabric] mouse:out', {
+      relatedTarget,
+      button: opt?.e?.button,
+      buttons: opt?.e?.buttons,
+      which: opt?.e?.which,
+      ctrlKey: !!opt?.e?.ctrlKey,
+      metaKey: !!opt?.e?.metaKey
+    });
+    
+    const domEl = this.fabricCanvas && (this.fabricCanvas.upperCanvasEl || this.fabricCanvas.lowerCanvasEl || (this.fabricCanvas.getElement && this.fabricCanvas.getElement()));
+    const leavingCanvas = !!relatedTarget && (relatedTarget === document.body || (domEl && !domEl.contains(relatedTarget)));
+    
+    if (this.isPanning && leavingCanvas) {
+      this.debug.log('events', '[drag] mouse:out - cancel panning');
+      this.isPanning = false;
+      this.fabricCanvas.defaultCursor = 'default';
+      this._suppressNextContextMenu = false;
+      
+      if (this._prevSkipTargetFind !== undefined) {
+        this.fabricCanvas.skipTargetFind = this._prevSkipTargetFind;
+        this._prevSkipTargetFind = undefined;
+      }
+      if (this._prevSelection !== undefined) {
+        this.fabricCanvas.selection = this._prevSelection;
+        this._prevSelection = undefined;
+      }
+      
+      if (this.mapInstance) {
+        this.mapInstance.update();
+      }
+      
+      this.emit('pan:completed');
+    }
+  }
+
+  /**
+   * Internal handler for container contextmenu events
+   * @private
+   */
+  _handleContainerContextMenu(e) {
+    this.debug.log('events', '[drag] contextmenu prevented', {
+      button: e.button,
+      buttons: e.buttons,
+      which: e.which,
+      ctrlKey: !!e.ctrlKey,
+      metaKey: !!e.metaKey,
+      altKey: !!e.altKey,
+      shiftKey: !!e.shiftKey,
+      pointerType: e.pointerType,
+      detail: e.detail
+    });
+    e.preventDefault();
+    e.stopPropagation();
+    if (this._suppressNextContextMenu) {
+      return false;
+    }
+    return false;
+  }
+
+  /**
+   * Internal handler for canvas contextmenu events
+   * @private
+   */
+  _handleCanvasContextMenu(e) {
+    this.debug.log('events', '[dom] contextmenu prevented on canvas', {
+      button: e.button,
+      buttons: e.buttons,
+      which: e.which,
+      ctrlKey: !!e.ctrlKey,
+      metaKey: !!e.metaKey,
+      altKey: !!e.altKey,
+      shiftKey: !!e.shiftKey,
+      pointerType: e.pointerType,
+      detail: e.detail
+    });
+    e.preventDefault();
+    e.stopPropagation();
+    if (this._suppressNextContextMenu) {
+      return false;
+    }
+    return false;
+  }
+
+  /**
+   * Internal handler for canvas mousedown events
+   * @private
+   */
+  _handleCanvasMouseDown(e) {
+    const isCtrlPrimary = e.ctrlKey && e.button === 0;
+    const isSecondaryBtn = e.button === 2;
+    
+    this.debug.log('events', '[dom] mousedown', {
+      button: e.button,
+      buttons: e.buttons,
+      which: e.which,
+      ctrlKey: !!e.ctrlKey,
+      metaKey: !!e.metaKey,
+      altKey: !!e.altKey,
+      shiftKey: !!e.shiftKey,
+      isCtrlPrimary,
+      isSecondaryBtn
+    });
+    
+    if (isCtrlPrimary || isSecondaryBtn) {
+      this.debug.log('events', '[dom] mousedown (no preventDefault) — will suppress upcoming contextmenu', { ctrlPrimary: isCtrlPrimary, secondaryBtn: isSecondaryBtn });
+      this._suppressNextContextMenu = true;
+    }
+  }
+
+  /**
+   * Destroy the Schematic instance and clean up all resources
+   * Removes event listeners, disposes canvas, and cleans up DOM elements
+   * @return {void}
+   */
+  destroy() {
+    this.debug.log('schematic', '[schematic] destroying instance');
+    
+    // Clear zoom debounce timeout
+    if (this.zoomDebounceTimeout) {
+      clearTimeout(this.zoomDebounceTimeout);
+      this.zoomDebounceTimeout = null;
+    }
+    
+    // Remove Fabric canvas event listeners
+    if (this.fabricCanvas) {
+      if (this._boundHandleMouseWheel) {
+        this.fabricCanvas.off('mouse:wheel', this._boundHandleMouseWheel);
+      }
+      if (this._boundHandleMouseDown) {
+        this.fabricCanvas.off('mouse:down', this._boundHandleMouseDown);
+      }
+      if (this._boundHandleMouseMove) {
+        this.fabricCanvas.off('mouse:move', this._boundHandleMouseMove);
+      }
+      if (this._boundHandleMouseUp) {
+        this.fabricCanvas.off('mouse:up', this._boundHandleMouseUp);
+      }
+      if (this._boundHandleMouseOut) {
+        this.fabricCanvas.off('mouse:out', this._boundHandleMouseOut);
+      }
+    }
+    
+    // Remove DOM event listeners
+    if (this.container && this._containerContextMenuHandler) {
+      this.container.removeEventListener('contextmenu', this._containerContextMenuHandler, false);
+    }
+    
+    if (this._canvasDomElement) {
+      if (this._canvasContextMenuHandler) {
+        this._canvasDomElement.removeEventListener('contextmenu', this._canvasContextMenuHandler);
+      }
+      if (this._canvasMouseDownHandler) {
+        this._canvasDomElement.removeEventListener('mousedown', this._canvasMouseDownHandler, true);
+      }
+    }
+    
+    // Clear all custom event listeners
+    this.clearAllListeners();
+    
+    // Dispose Fabric canvas
+    if (this.fabricCanvas && typeof this.fabricCanvas.dispose === 'function') {
+      this.fabricCanvas.dispose();
+    }
+    
+    // Remove canvas element from DOM
+    if (this.container && this.fabricCanvas) {
+      const canvasElement = this.fabricCanvas.getElement && this.fabricCanvas.getElement();
+      if (canvasElement && canvasElement.parentNode === this.container) {
+        this.container.removeChild(canvasElement);
+      }
+    }
+    
+    // Clear references
+    this.fabricCanvas = null;
+    this.mapInstance = null;
+    this.container = null;
+    this._canvasDomElement = null;
+    this._boundHandleMouseWheel = null;
+    this._boundHandleMouseDown = null;
+    this._boundHandleMouseMove = null;
+    this._boundHandleMouseUp = null;
+    this._boundHandleMouseOut = null;
+    this._containerContextMenuHandler = null;
+    this._canvasContextMenuHandler = null;
+    this._canvasMouseDownHandler = null;
+    
+    this.debug.log('schematic', '[schematic] destroyed successfully');
   }
 }
 

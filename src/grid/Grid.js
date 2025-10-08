@@ -3,6 +3,7 @@ import { clamp, almost } from '../lib/mumath/index.js';
 import gridStyle from './gridStyle.js';
 import Axis from './Axis.js';
 import { Point } from '../geometry/Point.js';
+import { Debug } from '../core/Debug.js';
 import { 
   calcCoordinate, 
   getCenterCoords, 
@@ -13,11 +14,15 @@ import {
   calculateTickPoints
 } from './grid-calcs.js';
 import {
+  MAX_NATURAL_INCREMENTS,
+  MIN_NATURAL_INCREMENTS,
   POINTS_PER_INCH,
-  POINTS_PER_CM,
+  POINTS_PER_MM,
   calculateMaxZoom,
   calculateGridSpacing,
   calculateLabelDensity,
+  isDisplayAtMinimum,
+  isDisplayAtMaximum,
   formatValueByUnits,
   convertDistance
 } from './grid-units.js';
@@ -51,17 +56,11 @@ class Grid extends Base {
   // Axis objects for x and y dimensions
   axisX = null;
   axisY = null;
-  
-  // Unit conversion constants
-  POINTS_PER_INCH = POINTS_PER_INCH; // Standard DTP points per inch
-  POINTS_PER_CM = POINTS_PER_CM; // Points per centimeter (72/2.54)
 
   // Grid configuration
   type = 'linear';
   name = '';
   units = 'points'; // Default units: points, imperial, metric
-  minZoom = -Infinity;
-  maxZoom = Infinity;
   min = -Infinity;
   max = Infinity;
   offset = 0;
@@ -96,9 +95,11 @@ class Grid extends Base {
     super(opts);
     this.context = context;
     
-    // Immediate debug to verify grid-units.js integration
-    console.log('[Grid-DEBUG] Grid class instantiated with units support');
-    console.log('[Grid-DEBUG] Units module functions available:', {
+    // Initialize debug system
+    this.debug = opts?.debug || new Debug(false);
+    
+    this.debug.log('grid', '[Grid] Grid class instantiated with units support');
+    this.debug.log('grid', '[Grid] Units module functions available:', {
       convertDistance: typeof convertDistance === 'function',
       formatValueByUnits: typeof formatValueByUnits === 'function',
       calculateGridSpacing: typeof calculateGridSpacing === 'function'
@@ -107,8 +108,7 @@ class Grid extends Base {
     this.setDefaults();
     this.updateConfiguration(opts);
     
-    // Force a units log
-    console.log('[Grid-DEBUG] Initial units:', this.units);
+    this.debug.log('grid', '[Grid] Initial units:', this.units);
   }
 
   render() {
@@ -143,7 +143,7 @@ class Grid extends Base {
     
     // Update grid spacing based on units and zoom level
     if (this.units && this.zoom) {
-      console.log(`[Grid] Calculating optimal spacing for units: ${this.units}, zoom: ${this.zoom}`);
+      this.debug.log('grid', `[Grid] Calculating optimal spacing for units: ${this.units}, zoom: ${this.zoom}`);
       
       // Pass unitToPixelSize from FabricJS if available
       const optimalSpacing = calculateGridSpacing(
@@ -153,10 +153,10 @@ class Grid extends Base {
         this.unitToPixelSize
       );
       
-      console.log(`[Grid] Optimal spacing calculated: ${optimalSpacing}`);
+      this.debug.log('grid', `[Grid] Optimal spacing calculated: ${optimalSpacing}`);
       if (optimalSpacing > 0) {
         this.distance = optimalSpacing;
-        console.log(`[Grid] Grid distance updated to: ${this.distance}`);
+        this.debug.log('grid', `[Grid] Grid distance updated to: ${this.distance}`);
       }
     }
 
@@ -177,16 +177,15 @@ class Grid extends Base {
     // Store unitToPixelSize if provided by FabricJS
     if (center.unitToPixelSize !== undefined) {
       this.unitToPixelSize = center.unitToPixelSize;
-      console.log(`[Grid] Received unitToPixelSize: ${this.unitToPixelSize} (pixels per unit at current zoom)`); 
       
       // Critical test for unit conversion - this will verify our scaling fix
       if (this.units === 'imperial') {
         // Test conversion of 100 points
         const testPoints = 100;
         const testInches = testPoints / 72; // Standard conversion: 72 points = 1 inch
-        console.log(`[Grid-TESTCONV] ${testPoints} points = ${testInches.toFixed(2)} inches`);
-        console.log(`[Grid-TESTCONV] For reference: 100 pixels should be about 1.39 inches, not 8'4"`);
-        console.log(`[Grid-TESTCONV] Current unitToPixelSize: ${this.unitToPixelSize} pixels per ${this.units} unit`);
+        this.debug.log('units', `[Grid-TESTCONV] ${testPoints} points = ${testInches.toFixed(2)} inches`);
+        this.debug.log('units', `[Grid-TESTCONV] For reference: 100 pixels should be about 1.39 inches, not 8'4"`);
+        this.debug.log('units', `[Grid-TESTCONV] Current unitToPixelSize: ${this.unitToPixelSize} pixels per ${this.units} unit`);
       }
     }
     
@@ -221,8 +220,6 @@ class Grid extends Base {
       // Geometry/viewport defaults expected by Axis/calculations
       zoom: 1,
       offset: 0,
-      minZoom: -Infinity,
-      maxZoom: Infinity,
       min: -Infinity,
       max: Infinity,
       axis: true,
@@ -301,9 +298,14 @@ class Grid extends Base {
    * @return {Grid} This instance for chaining
    */
   draw() {
+    // Reset the minimum increment tracking flag at the start of each render cycle
+    this.minimumIncrementDisplayed = false;
+    this.maximumIncrementDisplayed = false;
+    
     this.context.clearRect(0, 0, this.width, this.height);
     this.drawLines(this.state.x, this.context);
     this.drawLines(this.state.y, this.context);
+    
     return this;
   }
 
@@ -400,20 +402,9 @@ class Grid extends Base {
     this.units = units;
     
     // Convert grid spacing to the new unit system
-    console.log(`[Grid] Converting units from ${prevUnits} to ${units}, distance before: ${this.distance}`);
+    this.debug.log('units', `[Grid] Converting units from ${prevUnits} to ${units}, distance before: ${this.distance}`);
     this.distance = convertDistance(this.distance, prevUnits, units);
-    console.log(`[Grid] After conversion: distance = ${this.distance}`);
-    
-    // Update max zoom based on minimum natural increments
-    const previousMaxZoom = this.maxZoom;
-    this.maxZoom = calculateMaxZoom(units, this.pixelRatio, this.maxZoom);
-    console.log(`[Grid] Max zoom updated: ${previousMaxZoom} → ${this.maxZoom} for units: ${units}`);
-    
-    // If current zoom exceeds new max zoom, adjust it
-    if (this.zoom > this.maxZoom) {
-      console.log(`[Grid] Current zoom (${this.zoom}) exceeds max zoom, clamping to ${this.maxZoom}`);
-      this.zoom = this.maxZoom;
-    }
+    this.debug.log('units', `[Grid] After conversion: distance = ${this.distance}`);
     
     // Update configuration and render the grid
     this.updateConfiguration();
@@ -433,6 +424,22 @@ class Grid extends Base {
   getUnits() {
     return this.units;
   }
+  
+  /**
+   * Check if minimum increments are visible at the current zoom level
+   * @return {boolean} True if minimum increments are visible
+   */
+  isMinimumIncrementVisible() {
+    return this.minimumIncrementDisplayed === true;
+  }
+  
+  /**
+   * Check if maximum increments are visible at the current zoom level
+   * @return {boolean} True if maximum increments are visible
+   */
+  isMaximumIncrementVisible() {
+    return this.maximumIncrementDisplayed === true;
+  }
 
   drawLabels(state, ctx) {
     if (state.labels) {
@@ -448,9 +455,9 @@ class Grid extends Base {
       const isOpp = state.coordinate.orientation === 'y' && !state.opposite.disabled;
       
       // Calculate label density based on zoom level
-      console.log(`[Grid] Calculating label density for units: ${this.units}, zoom: ${this.zoom}`);
+      // console.log(`[Grid] Calculating label density for units: ${this.units}, zoom: ${this.zoom}`);
       const labelDensity = calculateLabelDensity(this.units, this.zoom);
-      console.log(`[Grid] Label density calculated: ${labelDensity} (will show 1 label per ${labelDensity} grid lines)`);
+      // console.log(`[Grid] Label density calculated: ${labelDensity} (will show 1 label per ${labelDensity} grid lines)`);
       
       for (let i = 0; i < state.labels.length; i += 1) {
         let label = state.labels[i];
@@ -483,18 +490,25 @@ class Grid extends Base {
           displayValue = label / POINTS_PER_INCH;
         } else if (this.units === 'metric') {
           // Convert from points to mm (2.835 points = 1 mm)
-          displayValue = label / (POINTS_PER_INCH / 25.4);
+          displayValue = label / POINTS_PER_MM;
         }
         
         // Format the label based on current units
         const formattedLabel = formatValueByUnits(displayValue, this.units);
         
-        // Only show the first label for debugging, if needed
-        if (i === 0) {
-          console.log(`[Grid] Label example: ${label} points → ${displayValue.toFixed(2)} ${this.units} → ${formattedLabel}`);
-        }
-        
         ctx.fillText(formattedLabel, textLeft, textTop);
+
+        // Check if this label represents the minimum natural increment for the current unit system
+        if (isDisplayAtMinimum(displayValue, this.units)) {
+          // Track that we've displayed the minimum increment
+          this.minimumIncrementDisplayed = true;
+        }
+
+        // Check if this label represents the maximum natural increment for the current unit system
+        if (isDisplayAtMaximum(displayValue, this.units)) {
+          // Track that we've displayed the maximum increment
+          this.maximumIncrementDisplayed = true;
+        }
       }
     }
   }

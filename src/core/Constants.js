@@ -1,5 +1,5 @@
 import { Point } from '../geometry/Point.js';
-import fabric from 'fabric';
+import * as fabric from 'fabric';
 
 export const Modes = {
   SELECT: 'SELECT',
@@ -11,8 +11,6 @@ export const Modes = {
 export const MAP = {
   center: new Point(),
   zoom: 1,
-  minZoom: 0,
-  maxZoom: 20,
   gridEnabled: true,
   zoomEnabled: true,
   selectEnabled: true,

@@ -1,4 +1,4 @@
-# IndoorJS Smart Grid Zoom Analysis
+# Schematic Smart Grid Zoom Analysis
 
 ## Current Zoom Handling
 

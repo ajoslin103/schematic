@@ -1,10 +1,11 @@
 import { clamp } from '../lib/mumath/index.js';
-import fabric from 'fabric';
+import * as fabric from 'fabric';
 
 import Base from '../core/Base.js';
 import { MAP, Modes, initializeFabric } from '../core/Constants.js';
 import Grid from '../grid/Grid.js';
 import { Point } from '../geometry/Point.js';
+import { Debug } from '../core/Debug.js';
 export class Map extends Base {
   constructor(container, options) {
     super(options);
@@ -20,6 +21,9 @@ export class Map extends Base {
     this.center = new Point(this.center);
 
     this.container = container || document.body;
+    
+    // Initialize debug system
+    this.debug = new Debug(options?.debug ?? false);
 
     const canvas = document.createElement('canvas');
     this.container.appendChild(canvas);
@@ -63,7 +67,7 @@ export class Map extends Base {
     
     // Listen for grid unit changes and force a complete re-render
     document.addEventListener('grid-units-changed', (e) => {
-      console.log(`[Map] Grid units changed event detected: ${e.detail?.units}`);
+      this.debug.log('map', `[Map] Grid units changed event detected: ${e.detail?.units}`);
       
       // Store current viewport center and transformation
       const vpt = this.fabricCanvas.viewportTransform;
@@ -86,7 +90,7 @@ export class Map extends Base {
           // Explicitly recenter the viewport
           this.fabricCanvas.setViewportTransform(vpt);
           
-          console.log('[Map] Re-centering viewport after unit change');
+          this.debug.log('map', '[Map] Re-centering viewport after unit change');
         }
         
         // Brute force approach to ensure all objects are visible
@@ -102,12 +106,12 @@ export class Map extends Base {
         setTimeout(() => this.fabricCanvas.renderAll(), 50);
       }, 100);
     });
-
+    
   }
 
   addGrid() {
     // Create grid using the fabric canvas context
-    this.grid = new Grid(this.context, this);
+    this.grid = new Grid(this.context, { ...this, debug: this.debug });
     
     // Set grid dimensions to match fabric canvas
     this.grid.width = this.fabricCanvas.width;
@@ -121,7 +125,7 @@ export class Map extends Base {
     
     // Hook into Fabric's render events to draw the grid after Fabric has rendered
     this.fabricCanvas.on('before:render', () => {
-      if (this.grid) {
+      if (this.grid && this.grid.visible !== false) {
         this.grid.render();
       }
     });
@@ -134,12 +138,15 @@ export class Map extends Base {
 
   setZoom(zoom) {
     const { width, height } = this.fabricCanvas;
-    this.zoom = clamp(zoom, this.minZoom, this.maxZoom);
+    
+    // Set zoom directly without constraints
+    this.zoom = zoom;
     this.dx = 0;
     this.dy = 0;
     this.x = width / 2.0;
     this.y = height / 2.0;
     this.update();
+    
     // Use setTimeout for browser compatibility
     setTimeout(() => {
       this.update();
@@ -193,15 +200,6 @@ export class Map extends Base {
 
   update() {
     const canvas = this.fabricCanvas;
-    
-    // Minimal debug info for the update cycle
-    console.log(`[Map] Update with zoom: ${this.zoom}`);
-    
-    // Always clamp zoom to bounds, even if set directly elsewhere
-    const z = clamp(this.zoom, this.minZoom, this.maxZoom);
-    if (z !== this.zoom) {
-      this.zoom = z;
-    }
 
     // First apply the zoom to the center of the canvas
     const centerPoint = new fabric.Point(canvas.width / 2, canvas.height / 2);
@@ -212,22 +210,15 @@ export class Map extends Base {
     if (this.grid) {
       // Get current viewport transform to calculate world coordinates
       const vpt = canvas.viewportTransform;
-      console.log(`[Map] Grid update with units: ${this.grid.units || 'unknown'}`);
-      
       if (vpt) {
         // Calculate the viewport center in world coordinates
         const centerX = (canvas.width / 2 - vpt[4]) / vpt[0];
         const centerY = (canvas.height / 2 - vpt[5]) / vpt[3];
         const gridCenterY = -centerY;
         
-        // Calculate coordinates
-        
         // Calculate unit to pixel size directly from the FabricJS viewport transform
         // vpt[0] is the x-scale factor which tells us how many pixels 1 unit takes up
         const unitToPixelSize = vpt[0];
-        
-        // Log the actual pixel size for debugging
-        console.log(`[Map] FabricJS unitToPixelSize: ${unitToPixelSize} pixels per unit at zoom ${this.zoom}`);
         
         // Create test points to verify scaling
         const originPoint = new fabric.Point(0, 0);
@@ -238,7 +229,6 @@ export class Map extends Base {
           Math.pow(pixelUnit.x - pixelOrigin.x, 2) + 
           Math.pow(pixelUnit.y - pixelOrigin.y, 2)
         );
-        console.log(`[Map] Verified: 1 unit = ${measuredPixels.toFixed(2)} pixels at current zoom`);
         
         // Calculate grid units for scaling - this is critical for proper conversion
         // FabricJS uses points as its base unit, so we need to calculate pixels per unit
@@ -264,12 +254,12 @@ export class Map extends Base {
         const scaledPixelSize = measuredPixels / unitScaleFactor;
         
         // Detailed logging to verify unit scaling is working correctly
-        console.log(`[Map] ===== UNIT CONVERSION INFO =====`);
-        console.log(`[Map] Base metrics: 1 FabricJS unit = ${measuredPixels.toFixed(4)} pixels at zoom ${this.zoom}`);
-        console.log(`[Map] Unit system: ${currentUnits}, scale factor: ${unitScaleFactor}`);
-        console.log(`[Map] Final: 1 ${currentUnits} = ${scaledPixelSize.toFixed(4)} pixels`);
-        console.log(`[Map] Expected ratios: 1 inch = 72 points, 1 mm = 2.835 points`);
-        console.log(`[Map] ===== END UNIT CONVERSION INFO =====`);
+        this.debug.log('units', `[Map] ===== UNIT CONVERSION INFO =====`);
+        this.debug.log('units', `[Map] Base metrics: 1 FabricJS unit = ${measuredPixels.toFixed(4)} pixels at zoom ${this.zoom}`);
+        this.debug.log('units', `[Map] Unit system: ${currentUnits}, scale factor: ${unitScaleFactor}`);
+        this.debug.log('units', `[Map] Final: 1 ${currentUnits} = ${scaledPixelSize.toFixed(4)} pixels`);
+        this.debug.log('units', `[Map] Expected ratios: 1 inch = 72 points, 1 mm = 2.835 points`);
+        this.debug.log('units', `[Map] ===== END UNIT CONVERSION INFO =====`);
         
         // Update the grid with the calculated values
         this.grid.updateViewport({
@@ -287,8 +277,10 @@ export class Map extends Base {
         });
       }
       
-      // Render the grid with the updated position
-      this.grid.render();
+      // Render the grid with the updated position (only if visible)
+      if (this.grid.visible !== false) {
+        this.grid.render();
+      }
       
       // Force Fabric canvas to re-render to ensure objects are displayed after unit changes
       this.fabricCanvas.requestRenderAll();

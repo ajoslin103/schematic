@@ -1,17 +1,26 @@
 {
-  "name": "@ajoslin23/schematic",
-  "version": "0.1.0",
-  "description": "The IndoorJs Grid as a FabricJS library, facilitates working above coordinate planes",
+  "name": "@ajoslin103/schematic",
+  "version": "1.0.0-beta.1",
+  "description": "A FabricJS library, facilitating working above coordinate planes",
   "type": "module",
   "main": "dist/schematic.cjs.js",
   "module": "dist/schematic.esm.js",
   "browser": "dist/schematic.umd.js",
   "types": "dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/schematic.esm.js",
+      "require": "./dist/schematic.cjs.js",
+      "browser": "./dist/schematic.umd.js",
+      "default": "./dist/schematic.cjs.js"
+    }
+  },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "rollup -c",
+    "build": "rollup -c && tsc --emitDeclarationOnly",
+    "build:types": "tsc --emitDeclarationOnly",
     "dev": "npm run build && (npm run watch & npm run serve)",
     "watch": "rollup -c -w",
     "serve": "browser-sync start --server --files 'dist/**/*.js,demo/**/*.html' --startPath demo/grid-demo.html",
@@ -40,6 +49,7 @@
     "@rollup/plugin-commonjs": "^28.0.6",
     "@rollup/plugin-node-resolve": "^16.0.1",
     "browser-sync": "^3.0.4",
-    "rollup": "^4.22.4"
+    "rollup": "^4.22.4",
+    "typescript": "^5.9.2"
   }
 }

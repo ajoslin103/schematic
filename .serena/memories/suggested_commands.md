@@ -1,8 +1,7 @@
-# Suggested Commands for indoorjs
+# Suggested Commands for Schematic
 
 ## Development
-- `npm start`: Launch development server with hot reloading
-- `webpack-dev-server` alias
+- `npm run dev`: Launch development server with hot reloading
 
 ## Testing
 - `npm test`: Run all tests (includes linting)
@@ -20,4 +19,3 @@
 ## Utilities
 - `npm run docs`: Generate documentation
 - `npm run integrity`: Verify file integrity hashes
-- `uglifyjs` for minification details

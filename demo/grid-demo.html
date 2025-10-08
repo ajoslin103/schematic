@@ -37,11 +37,16 @@
     <script src="https://cdn.jsdelivr.net/npm/fabric@6/dist/index.min.js"></script>
     <!-- Load UMD build of schematic to avoid CORS issues in browser -->
     <script src="../dist/schematic.umd.js"></script>
+    <!-- Load the calibration dialog styles -->
+    <link rel="stylesheet" href="../src/components/calibration/styles.css">
   </head>
 <body>
+  <!-- Calibration Dialog Container -->
+  <div id="calibration-dialog-container"></div>
+  
   <div class="controls">
     <div style="margin-bottom:15px;">
-      Schematic: The IndoorJs Grid as a FabricJS library, facilitates working above coordinate planes
+      Schematic: A FabricJS library, facilitating working above coordinate planes
       </div>
       <div style="margin-bottom:15px;">
         <label style="margin-right:15px;">
@@ -52,19 +57,14 @@
           <input type="checkbox" id="toggleZoomOnCenter" checked>
           Zoom on Origin
         </label>
+        <label style="margin-right:15px;">
+          <input type="checkbox" id="toggleMouseWheelZoom" checked disabled>
+          Mouse Wheel Zoom
+        </label>
         <label>
-          <input type="checkbox" id="toggleScrollbars">
+          <input type="checkbox" id="toggleScrollbars" disabled>
           Show Scrollbars
         </label>
-      </div>
-      <div style="margin-bottom:15px;">
-        <label style="margin-right:10px;">
-          Min Zoom: <input id="minZoomInput" type="number" step="0.01" value="0.05" style="width:70px;">
-        </label>
-        <label style="margin-right:10px;">
-          Max Zoom: <input id="maxZoomInput" type="number" step="0.01" value="20" style="width:70px;">
-        </label>
-        <!-- <button id="resetView">Reset View</button> -->
       </div>
       <div style="margin-bottom:15px;">
         <label style="margin-right:10px;">
@@ -85,6 +85,7 @@
       <div style="margin-bottom:15px;">
         <span id="coordinates">X: 0, Y: 0</span>
         <span id="zoomLevel" style="margin-left: 20px; font-family: monospace;">Zoom: 1.00x</span>
+        <span id="pixelRatio" style="margin-left: 20px; font-family: monospace;">Device Pixel Ratio: 1.0</span>
         <div id="docs" style="margin-left: 20px; font-family: monospace; font-style: italic;">
           <br> Use mouse wheel to zoom in/out.
           <br> Hold ALT key to zoom on cursor.
@@ -94,18 +95,23 @@
       <div style="margin-bottom:15px;">
         <label style="margin-right:10px;">
           Units: 
-          <select id="unitsSelect" style="width:100px;">
+          <select id="unitsSelect" style="width:100px;" >
             <option selected value="points">Points</option>
             <option value="imperial">Imperial</option>
             <option value="metric">Metric</option>
           </select>
         </label>
+        <button id="btn-calibrate" style="margin-left: 15px;">Calibration</button>
       </div>
     </div>
     <div id="canvas-container"></div>
     
-    <!-- Use globals exposed by UMD build -->
-    <script>
+    <!-- Module imports for calibration -->
+    <script type="module">
+      // Import calibration dialog
+      import CalibrationDialog from '../src/components/calibration/index.js';
+      
+      // Import Schematic from UMD build
       const { Grid, Schematic } = window.Schematic;
 
       document.addEventListener('DOMContentLoaded', () => {
@@ -183,28 +189,6 @@
         // Initial sizing
         resize();
 
-        const minZoom = document.getElementById('minZoomInput');
-        const maxZoom = document.getElementById('maxZoomInput');
-        const updateZoom = () => {
-          // No zoom clamping - simply use the input values directly
-          const zoomValue = Number(minZoom.value) || 0.01;
-          const maxValue = Number(maxZoom.value) || 20;
-          
-          // Update zoom without limits
-          schematic.setZoomLimits(-Infinity, Infinity);
-          
-          // Set current zoom without clamping
-          const currentZoom = mapInstance.zoom || 1.0;
-          schematic.setZoom(currentZoom);
-        };
-        
-        // Add event listeners for zoom controls
-        minZoom?.addEventListener('change', updateZoom);
-        maxZoom?.addEventListener('change', updateZoom);
-        
-        // Initial zoom setup
-        updateZoom();
-
         // Persist-only: wire Show Scrollbars to schematic (no behavior)
         const toggleScrollbars = document.getElementById('toggleScrollbars');
         const syncScrollbarsPref = () => {
@@ -225,9 +209,21 @@
             schematic.setZoomOnCenter(checked);
           }
         };
-        toggleZoomOnCenter?.addEventListener('change', syncScrollbarsPref);
+        toggleZoomOnCenter?.addEventListener('change', syncZoomOnCenterPref);
         // Initialize preference on load
-        syncScrollbarsPref();
+        syncZoomOnCenterPref();
+
+        // Wire Mouse Wheel Zoom to schematic
+        const toggleMouseWheelZoom = document.getElementById('toggleMouseWheelZoom');
+        const syncMouseWheelZoomPref = () => {
+          const checked = !!toggleMouseWheelZoom?.checked;
+          if (typeof schematic.setMouseWheelZoom === 'function') {
+            schematic.setMouseWheelZoom(checked);
+          }
+        };
+        toggleMouseWheelZoom?.addEventListener('change', syncMouseWheelZoomPref);
+        // Initialize preference on load
+        syncMouseWheelZoomPref();
 
         // Persist-only: wire Show Grid to schematic (no behavior)
         const toggleGrid = document.getElementById('toggleGrid');
@@ -237,9 +233,9 @@
             schematic.setShowGrid(checked);
           }
         };
-        toggleGrid?.addEventListener('change', syncScrollbarsPref);
+        toggleGrid?.addEventListener('change', syncShowGridPref);
         // Initialize preference on load
-        syncScrollbarsPref();
+        syncShowGridPref();
 
         // Add sample content to demonstrate the library using Schematic's API
         const circle = new fabric.Circle({
@@ -281,6 +277,15 @@
             document.getElementById('zoomLevel').textContent = zoomLevel;
           }
           
+          // Update device pixel ratio display
+          if (document.getElementById('pixelRatio')) {
+            // Use calibrated pixel ratio if available, otherwise use reported ratio
+            const reportedRatio = window.devicePixelRatio || 1;
+            const calibratedRatio = window.calibratedDPR || reportedRatio;
+            document.getElementById('pixelRatio').textContent = 
+              `Device Pixel Ratio: ${calibratedRatio.toFixed(3)} (Reported: ${reportedRatio.toFixed(3)})`;
+          }
+          
           // Coordinates are updated live from mouse:move
         }
 
@@ -319,6 +324,64 @@
         unitsSelect?.addEventListener('change', syncUnits);
         // Initialize units on load
         syncUnits();
+        
+        // Initialize calibration dialog
+        const calibrationDialogContainer = document.getElementById('calibration-dialog-container');
+        const calibrateBtn = document.getElementById('btn-calibrate');
+        
+        // Create calibration dialog instance with appropriate unit system
+        const calibrationDialog = new CalibrationDialog({
+          container: calibrationDialogContainer,
+          gridState: window.gridState || {}, // Create if it doesn't exist
+          system: unitsSelect?.value || 'points', // Use current units selection
+          targetHeight: 318, // Target height in pixels
+          dpi: 96, // Standard DPI
+          onCalibrationComplete: (result) => {
+            // Store the calculated device pixel ratio globally
+            window.calibratedDPR = result.calculatedDPR;
+            
+            // Update the display to show the new calibrated ratio
+            updateUIDisplay();
+            
+            // Log the calibration results
+            console.log('Calibration completed:', result);
+          }
+        });
+        
+        // Set trigger button
+        calibrationDialog.setTriggerButton(calibrateBtn);
+        
+        // Update calibration when units change
+        unitsSelect?.addEventListener('change', () => {
+          // Recreate calibration with new units
+          const newCalibration = new CalibrationDialog({
+            container: calibrationDialogContainer,
+            gridState: window.gridState || {},
+            system: unitsSelect.value,
+            targetHeight: 318,
+            dpi: 96,
+            onCalibrationComplete: (result) => {
+              // Store the calculated device pixel ratio globally
+              window.calibratedDPR = result.calculatedDPR;
+              
+              // Update the display to show the new calibrated ratio
+              updateUIDisplay();
+              
+              // Log the calibration results
+              console.log('Calibration completed:', result);
+            }
+          });
+          newCalibration.setTriggerButton(calibrateBtn);
+        });
+        
+        // Store gridState for calibration
+        window.gridState = {
+          zoom: 1,
+          referenceScale: 0
+        };
+        
+        // Initialize calibrated DPR with the reported one
+        window.calibratedDPR = window.devicePixelRatio || 1;
         
         // Listen for units change events from Schematic
         schematic.on('units:change', (data) => {
