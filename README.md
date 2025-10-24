@@ -1,8 +1,10 @@
 # Schematic
 
-A lightweight [Fabric.js](https://fabricjs.com/) library for working with canvas objects on an interactive coordinate grid.
+A lightweight [Fabric.js](https://fabricjs.com/) library for working with canvas objects above an interactive coordinate grid.
 
 [![Demo Video](https://customer-07ipt1f17u9wyil4.cloudflarestream.com/d7447956e969ce80d2f0113a59a04324/thumbnails/thumbnail.jpg?time=&height=600)](https://customer-07ipt1f17u9wyil4.cloudflarestream.com/d7447956e969ce80d2f0113a59a04324/watch)
+
+<small>(click image to watch video)</small>
 
 ## Features
 
@@ -26,7 +28,7 @@ Your App → Schematic → Map → Fabric Canvas
 
 **Schematic** – Main entry point with event system and interaction controls  
 **Map** – Manages Fabric canvas lifecycle and grid synchronization  
-**Grid** – Renders coordinate grid, axes, and labels beneath Fabric objects  
+**Grid** – Renders coordinate grid, axis, and labels beneath Fabric objects  
 **Base** – Shared configuration foundation for all components
 
 ## Installation
